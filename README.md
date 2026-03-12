@@ -1,6 +1,6 @@
 # MediaMover
 
-A native macOS app to organize photos and videos into folders based on EXIF metadata or file dates. Inspired by PhotoMove2, with full video and RAW format support.
+A native macOS app to organize photos, videos, and other files into folders based on EXIF metadata or file dates. Inspired by PhotoMove2, with full video, RAW format, and non-media file support.
 
 ## Download
 
@@ -13,7 +13,22 @@ A native macOS app to organize photos and videos into folders based on EXIF meta
 - **Video metadata** — reads creation date from MOV, MP4, MKV and other formats
 - **7 folder patterns** — YYYY/MM/DD, YYYY/MM, YYYY_MM_DD, with camera model variants
 - **Copy or Move mode** — choose whether to keep or move originals
-- **Fallback dating** — uses file modification date when no metadata is available
+- **Non-media files** — optionally include documents, archives, and any other file types
+
+### Date Handling
+- **File Creation Date** fallback (default) when no EXIF/metadata is found
+- **File Modification Date** fallback as alternative
+- **Skip** files with no metadata date available
+
+### File Renaming
+- **Rename with date** — prepend full timestamp to filenames
+- Format: `YYYYMMDD_HHMMSSmmm_originalname.ext` (down to the millisecond)
+- Example: `20260312_143522123_IMG_4567.jpg`
+
+### Folder Organization
+- **Camera subfolder** — create subfolders by camera model (e.g. `2026/03/12/iPhone 15 Pro/`)
+- **Videos subfolder** — separate videos into a `Videos` subfolder (e.g. `2026/03/12/Videos/`)
+- Both options can be combined with any folder pattern
 
 ### Integrity Verification
 - **Post-copy checksum** verification enabled by default
@@ -48,10 +63,12 @@ A native macOS app to organize photos and videos into folders based on EXIF meta
 
 **RAW Video**: BRAW (Blackmagic), R3D (RED), ARI/ARR (ARRI), CRM (Canon Cinema)
 
+**Other**: Any file type can be included via the "Other Files" toggle
+
 ## Requirements
 
 - macOS 14 (Sonoma) or later
-- Apple Silicon (M1/M2/M3) or Intel Mac
+- Apple Silicon (M1/M2/M3/M4) or Intel Mac
 
 ## Build from Source
 
@@ -68,14 +85,21 @@ make dmg
 
 ## Usage
 
-1. Select a **source folder** containing photos/videos
+1. Select a **source folder** containing photos/videos/files
 2. Select a **destination folder**
 3. Choose a folder pattern (e.g., YYYY/MM/DD)
-4. Configure mode (Copy/Move), duplicate handling, and integrity verification
-5. Click **Scan** to discover media files and read metadata
+4. Configure options:
+   - **Mode**: Copy or Move
+   - **File types**: Photos, Videos, Other Files
+   - **Duplicates**: Ask, Automatic, or Skip
+   - **Date fallback**: Creation date, Modification date, or Skip
+   - **Subfolders**: Videos subfolder, Camera subfolder
+   - **Rename**: Prepend date/time to filenames
+   - **Integrity**: XXHash64 or SHA-256 verification
+5. Click **Scan** to discover files and read metadata
 6. Click **Organize** to start
 
-Use the **undo button** (top-right) to reverse the last operation, or the **log button** to review activity history.
+Use the **undo button** (↩) to reverse the last operation, or the **log button** (📋) to review activity history.
 
 ## License
 
