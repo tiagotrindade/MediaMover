@@ -107,7 +107,13 @@ struct MainView: View {
                 if !viewModel.discoveredFiles.isEmpty {
                     let photoCount = viewModel.discoveredFiles.filter { $0.mediaType == .photo }.count
                     let videoCount = viewModel.discoveredFiles.filter { $0.mediaType == .video }.count
-                    Text("\(viewModel.discoveredFiles.count) files (\(photoCount) photos, \(videoCount) videos)")
+                    let otherCount = viewModel.discoveredFiles.filter { $0.mediaType == .other }.count
+                    let parts = [
+                        photoCount > 0 ? "\(photoCount) photos" : nil,
+                        videoCount > 0 ? "\(videoCount) videos" : nil,
+                        otherCount > 0 ? "\(otherCount) other" : nil
+                    ].compactMap { $0 }.joined(separator: ", ")
+                    Text("\(viewModel.discoveredFiles.count) files (\(parts))")
                         .font(.callout)
                         .foregroundStyle(.secondary)
                 }
@@ -150,11 +156,20 @@ struct MainView: View {
         }
     }
 
+    private func iconForMediaType(_ type: MediaType) -> (name: String, color: Color) {
+        switch type {
+        case .photo: return ("photo", .blue)
+        case .video: return ("video", .purple)
+        case .other: return ("doc", .gray)
+        }
+    }
+
     private var fileList: some View {
         List(viewModel.discoveredFiles) { file in
             HStack {
-                Image(systemName: file.mediaType == .photo ? "photo" : "video")
-                    .foregroundStyle(file.mediaType == .photo ? .blue : .purple)
+                let icon = iconForMediaType(file.mediaType)
+                Image(systemName: icon.name)
+                    .foregroundStyle(icon.color)
                     .frame(width: 20)
 
                 VStack(alignment: .leading) {

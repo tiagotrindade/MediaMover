@@ -13,6 +13,13 @@ final class OrganizerViewModel {
     var operationMode: OperationMode = .copy
     var includePhotos: Bool = true
     var includeVideos: Bool = true
+    var includeOtherFiles: Bool = false
+
+    // Date fallback
+    var dateFallback: DateFallback = .creationDate
+
+    // Video subfolder
+    var separateVideos: Bool = false
 
     // Duplicate handling
     var duplicateStrategy: DuplicateStrategy = .automatic
@@ -82,7 +89,8 @@ final class OrganizerViewModel {
         let urls = FileEnumerator.enumerateMedia(
             in: source,
             includePhotos: includePhotos,
-            includeVideos: includeVideos
+            includeVideos: includeVideos,
+            includeOtherFiles: includeOtherFiles
         )
 
         totalFiles = urls.count
@@ -113,7 +121,9 @@ final class OrganizerViewModel {
             scanMessage = "Read metadata: \(files.count) / \(urls.count)"
         }
 
-        discoveredFiles = files.sorted { $0.effectiveDate > $1.effectiveDate }
+        discoveredFiles = files.sorted {
+            ($0.effectiveDate() ?? .distantPast) > ($1.effectiveDate() ?? .distantPast)
+        }
         isScanning = false
         scanMessage = ""
     }
@@ -138,7 +148,9 @@ final class OrganizerViewModel {
             duplicateStrategy: duplicateStrategy,
             duplicateAction: duplicateAction,
             verifyIntegrity: verifyIntegrity,
-            hashAlgorithm: hashAlgorithm
+            hashAlgorithm: hashAlgorithm,
+            dateFallback: dateFallback,
+            separateVideos: separateVideos
         )
 
         // Duplicate resolver for "Ask" mode
@@ -283,6 +295,7 @@ final class OrganizerViewModel {
         guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
 
         let modDate = (attrs[.modificationDate] as? Date) ?? Date()
+        let creationDate = attrs[.creationDate] as? Date
         let fileSize = (attrs[.size] as? Int64) ?? 0
 
         let ext = url.pathExtension.lowercased()
@@ -300,16 +313,20 @@ final class OrganizerViewModel {
             let meta = await MetadataExtractor.extractVideoMetadata(from: url)
             dateTaken = meta.dateTaken
             cameraModel = meta.cameraModel
-        case nil:
-            return nil
+        case .other, nil:
+            // Non-media files — no metadata extraction
+            dateTaken = nil
+            cameraModel = nil
         }
 
         return MediaFile(
             url: url,
             dateTaken: dateTaken,
             cameraModel: cameraModel,
+            fileCreationDate: creationDate,
             fileModificationDate: modDate,
-            fileSize: fileSize
+            fileSize: fileSize,
+            mediaType: mediaType
         )
     }
 }

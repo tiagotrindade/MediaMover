@@ -28,6 +28,8 @@ struct OrganizerConfig: Sendable {
     let duplicateAction: DuplicateAction        // used when strategy == .automatic
     let verifyIntegrity: Bool
     let hashAlgorithm: HashAlgorithm
+    let dateFallback: DateFallback
+    let separateVideos: Bool                     // put videos in a "Videos" subfolder
 }
 
 // MARK: - Duplicate resolution callback (for "Ask" mode)
@@ -59,7 +61,22 @@ actor FileOrganizer {
         for (index, file) in files.enumerated() {
             await progressCallback(index + 1, files.count, file.fileName)
 
-            let subpath = config.pattern.destinationSubpath(for: file.effectiveDate, camera: file.cameraModel)
+            // Determine the effective date using the configured fallback
+            guard let effectiveDate = file.effectiveDate(fallback: config.dateFallback) else {
+                // No date available and user chose "no fallback" — skip this file
+                result.skippedDuplicates += 1
+                result.processedFiles += 1
+                await logger.log(action: "skip", source: file.url.path, status: .warning, details: "No date available (metadata or file date)")
+                continue
+            }
+
+            var subpath = config.pattern.destinationSubpath(for: effectiveDate, camera: file.cameraModel)
+
+            // Add "Videos" subfolder for video files if enabled
+            if config.separateVideos && file.mediaType == .video {
+                subpath += "/Videos"
+            }
+
             let destDir = destination.appendingPathComponent(subpath)
 
             // Create destination directory

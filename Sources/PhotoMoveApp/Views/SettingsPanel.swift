@@ -22,6 +22,8 @@ struct SettingsPanel: View {
 
                 Toggle("Photos", isOn: $viewModel.includePhotos)
                 Toggle("Videos", isOn: $viewModel.includeVideos)
+                Toggle("Other Files", isOn: $viewModel.includeOtherFiles)
+                    .help("Include non-media files (documents, archives, etc.)")
             }
 
             // Row 2: Duplicate handling
@@ -48,7 +50,29 @@ struct SettingsPanel: View {
                 }
             }
 
-            // Row 3: Integrity verification
+            // Row 3: Date fallback + Video subfolder
+            HStack(spacing: 12) {
+                Text("No metadata:")
+                    .fontWeight(.medium)
+
+                Picker("", selection: $viewModel.dateFallback) {
+                    ForEach(DateFallback.allCases, id: \.self) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+                .frame(width: 190)
+                .labelsHidden()
+                .help("What date to use when no EXIF/metadata date is found")
+
+                Divider().frame(height: 16)
+
+                Toggle("Videos subfolder", isOn: $viewModel.separateVideos)
+                    .help("Place videos inside a 'Videos' subfolder (e.g. 2026/01/26/Videos)")
+
+                Spacer()
+            }
+
+            // Row 4: Integrity verification
             HStack(spacing: 12) {
                 Toggle("Verify integrity after copy", isOn: $viewModel.verifyIntegrity)
 
