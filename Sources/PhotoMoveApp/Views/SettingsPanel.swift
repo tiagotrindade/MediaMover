@@ -5,8 +5,8 @@ struct SettingsPanel: View {
 
     var body: some View {
         VStack(spacing: 10) {
+            // Row 1: Mode + Media Types
             HStack(spacing: 20) {
-                // Operation mode
                 HStack {
                     Text("Mode:")
                         .fontWeight(.medium)
@@ -20,23 +20,49 @@ struct SettingsPanel: View {
                     .labelsHidden()
                 }
 
-                // Duplicate handling
-                HStack {
-                    Text("Duplicates:")
-                        .fontWeight(.medium)
-                    Picker("", selection: $viewModel.duplicateHandling) {
-                        ForEach(DuplicateHandling.allCases, id: \.self) { handling in
-                            Text(handling.rawValue).tag(handling)
+                Toggle("Photos", isOn: $viewModel.includePhotos)
+                Toggle("Videos", isOn: $viewModel.includeVideos)
+            }
+
+            // Row 2: Duplicate handling
+            HStack(spacing: 12) {
+                Text("Duplicates:")
+                    .fontWeight(.medium)
+
+                Picker("", selection: $viewModel.duplicateStrategy) {
+                    ForEach(DuplicateStrategy.allCases, id: \.self) { strategy in
+                        Text(strategy.rawValue).tag(strategy)
+                    }
+                }
+                .frame(width: 150)
+                .labelsHidden()
+
+                if viewModel.duplicateStrategy == .automatic {
+                    Picker("Action:", selection: $viewModel.duplicateAction) {
+                        ForEach(DuplicateAction.allCases, id: \.self) { action in
+                            Text(action.rawValue).tag(action)
                         }
                     }
-                    .frame(width: 120)
+                    .frame(width: 160)
                     .labelsHidden()
                 }
             }
 
-            HStack(spacing: 20) {
-                Toggle("Photos", isOn: $viewModel.includePhotos)
-                Toggle("Videos", isOn: $viewModel.includeVideos)
+            // Row 3: Integrity verification
+            HStack(spacing: 12) {
+                Toggle("Verify integrity after copy", isOn: $viewModel.verifyIntegrity)
+
+                if viewModel.verifyIntegrity {
+                    Picker("", selection: $viewModel.hashAlgorithm) {
+                        ForEach(HashAlgorithm.allCases, id: \.self) { algo in
+                            Text(algo.rawValue).tag(algo)
+                        }
+                    }
+                    .frame(width: 170)
+                    .labelsHidden()
+                }
+
+                Spacer()
             }
         }
         .padding(.horizontal)

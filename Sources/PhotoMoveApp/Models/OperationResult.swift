@@ -7,6 +7,11 @@ struct OperationResult: Sendable {
     var errors: [(file: String, error: String)] = []
     var elapsedTime: TimeInterval = 0
 
+    // Integrity verification
+    var verifiedFiles: Int = 0
+    var verificationFailures: Int = 0
+    var verificationErrors: [(file: String, error: String)] = []
+
     var successCount: Int { processedFiles - errors.count }
 }
 
