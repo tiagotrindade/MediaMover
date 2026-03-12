@@ -1,53 +1,82 @@
-# PhotoMoveApp
+# MediaMover
 
-A macOS application that organizes photos and videos into folders based on EXIF metadata or file dates. Inspired by PhotoMove2, with extended video support.
+A native macOS app to organize photos and videos into folders based on EXIF metadata or file dates. Inspired by PhotoMove2, with full video and RAW format support.
+
+## Download
+
+**[Download latest DMG](https://github.com/tiagotrindade/MediaMover/releases/latest)** — macOS 14+ (Apple Silicon & Intel)
 
 ## Features
 
-- **EXIF-based organization** — reads DateTaken from photo EXIF data
-- **Video metadata support** — reads creation date from MOV, MP4, and other video formats
+### Media Organization
+- **EXIF-based sorting** — reads DateTaken from photo EXIF data
+- **Video metadata** — reads creation date from MOV, MP4, MKV and other formats
 - **7 folder patterns** — YYYY/MM/DD, YYYY/MM, YYYY_MM_DD, with camera model variants
-- **Copy or Move** — choose whether to copy or move files
-- **Duplicate detection** — SHA256 hashing with skip/rename/overwrite options
+- **Copy or Move mode** — choose whether to keep or move originals
 - **Fallback dating** — uses file modification date when no metadata is available
+
+### Integrity Verification
+- **Post-copy checksum** verification enabled by default
+- **XXHash64** — fast hashing for large batches
+- **SHA-256** — option for maximum security
+- Detects corrupted copies immediately after transfer
+
+### Duplicate Detection
+- **Ask Each Time** — per-file dialog: rename, replace, replace if larger, or skip (with "apply to all" option)
+- **Automatic** — configurable default action (rename / replace / replace if larger)
+- **Don't Move** — skip all duplicates
+
+### Activity Log
+- Full operation log with timestamps and status indicators
+- Searchable and filterable (by status or text)
+- Export log file for external review
+
+### Undo
+- Reverse the last batch operation with one click
+- Copy undo: removes copied files
+- Move undo: moves files back to original location
+- Persistent history across sessions (up to 50 batches)
+- Automatic cleanup of empty directories
 
 ### Supported Formats
 
-- **Photos**: JPG, JPEG, PNG, HEIC, HEIF, TIFF, TIF, CR2, NEF, ARW, DNG, ORF, RAF, RW2
-- **Videos**: MOV, MP4, AVI, MKV, M4V, 3GP, WMV
+**Photos**: JPG, JPEG, PNG, HEIC, HEIF, TIFF, TIF, BMP, GIF, WebP
+
+**RAW Photos**: CR2, CR3, CRW (Canon), NEF, NRW (Nikon), ARW, SR2, SRF (Sony), DNG (Adobe), ORF (Olympus), RAF (Fujifilm), RW2 (Panasonic), PEF (Pentax), SRW (Samsung), X3F (Sigma), IIQ, 3FR, FFF (Medium Format), RWL, MRW, ERF, KDC, DCR
+
+**Videos**: MOV, MP4, AVI, MKV, M4V, 3GP, WMV, FLV, WebM, MTS, M2TS, TS, MPG, MPEG, VOB
+
+**RAW Video**: BRAW (Blackmagic), R3D (RED), ARI/ARR (ARRI), CRM (Canon Cinema)
 
 ## Requirements
 
 - macOS 14 (Sonoma) or later
-- Apple Silicon (M1) or Intel Mac
-- Swift 6.0+
+- Apple Silicon (M1/M2/M3) or Intel Mac
 
-## Build & Run
+## Build from Source
 
 ```bash
-# Build
-swift build
+# Build and run
+swift build && swift run
 
-# Run
-swift run
+# Create .app bundle
+make app
 
-# Release build
-swift build -c release
-
-# Open in Xcode
-open Package.swift
+# Create .dmg for distribution
+make dmg
 ```
 
 ## Usage
 
-1. Click **Browse** to select a source folder containing photos/videos
-2. Click **Browse** to select a destination folder
+1. Select a **source folder** containing photos/videos
+2. Select a **destination folder**
 3. Choose a folder pattern (e.g., YYYY/MM/DD)
-4. Select Copy or Move mode
-5. Configure duplicate handling (Skip, Rename, or Overwrite)
-6. Click **Scan** to discover media files and read metadata
-7. Click **Organize** to start the operation
+4. Configure mode (Copy/Move), duplicate handling, and integrity verification
+5. Click **Scan** to discover media files and read metadata
+6. Click **Organize** to start
+
+Use the **undo button** (top-right) to reverse the last operation, or the **log button** to review activity history.
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License
