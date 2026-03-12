@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>PhotoMoveApp</string>
+    <string>MediaMover</string>
     <key>CFBundleIdentifier</key>
-    <string>com.photomoveapp.PhotoMoveApp</string>
+    <string>com.mediamover.MediaMover</string>
     <key>CFBundleName</key>
-    <string>PhotoMove</string>
+    <string>MediaMover</string>
     <key>CFBundleDisplayName</key>
-    <string>PhotoMove</string>
+    <string>MediaMover</string>
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>CFBundleShortVersionString</key>

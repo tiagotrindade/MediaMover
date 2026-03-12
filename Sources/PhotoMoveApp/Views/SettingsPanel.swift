@@ -50,7 +50,7 @@ struct SettingsPanel: View {
                 }
             }
 
-            // Row 3: Date fallback + Video subfolder
+            // Row 3: Date fallback
             HStack(spacing: 12) {
                 Text("No metadata:")
                     .fontWeight(.medium)
@@ -64,15 +64,28 @@ struct SettingsPanel: View {
                 .labelsHidden()
                 .help("What date to use when no EXIF/metadata date is found")
 
-                Divider().frame(height: 16)
+                Spacer()
+            }
 
+            // Row 4: Subfolders + Rename
+            HStack(spacing: 12) {
                 Toggle("Videos subfolder", isOn: $viewModel.separateVideos)
                     .help("Place videos inside a 'Videos' subfolder (e.g. 2026/01/26/Videos)")
+
+                Divider().frame(height: 16)
+
+                Toggle("Camera subfolder", isOn: $viewModel.separateByCamera)
+                    .help("Create a subfolder with the camera model name (when available)")
+
+                Divider().frame(height: 16)
+
+                Toggle("Rename with date", isOn: $viewModel.renameWithDate)
+                    .help("Prepend date to filename: 20260312_143522123_originalname.jpg")
 
                 Spacer()
             }
 
-            // Row 4: Integrity verification
+            // Row 5: Integrity verification
             HStack(spacing: 12) {
                 Toggle("Verify integrity after copy", isOn: $viewModel.verifyIntegrity)
 

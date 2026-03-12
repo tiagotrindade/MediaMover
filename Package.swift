@@ -3,16 +3,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "PhotoMoveApp",
+    name: "MediaMover",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "PhotoMoveApp", targets: ["PhotoMoveApp"])
+        .executable(name: "MediaMover", targets: ["MediaMover"])
     ],
     targets: [
         .executableTarget(
-            name: "PhotoMoveApp",
+            name: "MediaMover",
             path: "Sources/PhotoMoveApp",
             swiftSettings: [
                 .swiftLanguageMode(.v5)

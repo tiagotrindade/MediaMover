@@ -21,6 +21,12 @@ final class OrganizerViewModel {
     // Video subfolder
     var separateVideos: Bool = false
 
+    // Rename with date prefix
+    var renameWithDate: Bool = false
+
+    // Camera subfolder
+    var separateByCamera: Bool = false
+
     // Duplicate handling
     var duplicateStrategy: DuplicateStrategy = .automatic
     var duplicateAction: DuplicateAction = .rename
@@ -150,7 +156,9 @@ final class OrganizerViewModel {
             verifyIntegrity: verifyIntegrity,
             hashAlgorithm: hashAlgorithm,
             dateFallback: dateFallback,
-            separateVideos: separateVideos
+            separateVideos: separateVideos,
+            renameWithDate: renameWithDate,
+            separateByCamera: separateByCamera
         )
 
         // Duplicate resolver for "Ask" mode

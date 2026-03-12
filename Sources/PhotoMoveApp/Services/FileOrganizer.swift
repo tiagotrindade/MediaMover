@@ -30,6 +30,8 @@ struct OrganizerConfig: Sendable {
     let hashAlgorithm: HashAlgorithm
     let dateFallback: DateFallback
     let separateVideos: Bool                     // put videos in a "Videos" subfolder
+    let renameWithDate: Bool                     // prepend YYYYMMDD_HHMMSSmmm_ to filename
+    let separateByCamera: Bool                   // add camera-name subfolder
 }
 
 // MARK: - Duplicate resolution callback (for "Ask" mode)
@@ -72,6 +74,12 @@ actor FileOrganizer {
 
             var subpath = config.pattern.destinationSubpath(for: effectiveDate, camera: file.cameraModel)
 
+            // Add camera subfolder if enabled and camera info is available
+            if config.separateByCamera, let camera = file.cameraModel, !camera.isEmpty {
+                let safeCam = sanitizeFolderName(camera)
+                subpath += "/\(safeCam)"
+            }
+
             // Add "Videos" subfolder for video files if enabled
             if config.separateVideos && file.mediaType == .video {
                 subpath += "/Videos"
@@ -90,7 +98,15 @@ actor FileOrganizer {
                 continue
             }
 
-            var targetURL = destDir.appendingPathComponent(file.fileName)
+            // Determine target filename (optionally prepend date)
+            let targetFileName: String
+            if config.renameWithDate {
+                targetFileName = datePrefix(for: effectiveDate) + file.fileName
+            } else {
+                targetFileName = file.fileName
+            }
+
+            var targetURL = destDir.appendingPathComponent(targetFileName)
 
             // MARK: Duplicate detection
             if fm.fileExists(atPath: targetURL.path) {
@@ -226,6 +242,25 @@ actor FileOrganizer {
     }
 
     // MARK: - Helpers
+
+    /// Generates a date prefix like "20260312_143522123_"
+    private func datePrefix(for date: Date) -> String {
+        let cal = Calendar.current
+        let y = cal.component(.year, from: date)
+        let mo = cal.component(.month, from: date)
+        let d = cal.component(.day, from: date)
+        let h = cal.component(.hour, from: date)
+        let mi = cal.component(.minute, from: date)
+        let s = cal.component(.second, from: date)
+        let ns = cal.component(.nanosecond, from: date)
+        let ms = ns / 1_000_000
+        return String(format: "%04d%02d%02d_%02d%02d%02d%03d_", y, mo, d, h, mi, s, ms)
+    }
+
+    private func sanitizeFolderName(_ name: String) -> String {
+        let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|")
+        return name.components(separatedBy: illegal).joined(separator: "_").trimmingCharacters(in: .whitespaces)
+    }
 
     private func uniqueURL(for url: URL, fm: FileManager) -> URL {
         let directory = url.deletingLastPathComponent()
