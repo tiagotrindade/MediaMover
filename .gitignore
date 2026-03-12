@@ -1,0 +1,22 @@
+# Build artifacts
+.build/
+*.o
+*.d
+
+# Xcode / SwiftPM
+*.xcodeproj/
+*.xcworkspace/
+.swiftpm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# App bundle and DMG (gerados pelo Makefile)
+*.app/
+*.dmg
+
+# Logs
+*.log
