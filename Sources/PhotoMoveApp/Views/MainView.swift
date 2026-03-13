@@ -243,8 +243,9 @@ struct MainView: View {
         HStack(spacing: 6) {
             if viewModel.renameWithDate    { Badge(text: "Rename") }
             if viewModel.separateByCamera  { Badge(text: "Camera") }
-            if viewModel.separateVideos    { Badge(text: "Videos/") }
+            if !viewModel.separateVideos   { Badge(text: "No Videos/", color: .orange) }
             if !viewModel.verifyIntegrity  { Badge(text: "No verify", color: .orange) }
+            if viewModel.duplicateStrategy != .ask { Badge(text: viewModel.duplicateStrategy.rawValue) }
         }
     }
 
@@ -274,7 +275,7 @@ struct MainView: View {
             }
 
             // No metadata fallback
-            AdvancedRow(label: "No metadata", icon: "calendar.badge.exclamationmark") {
+            AdvancedRow(label: "No metadata on file", icon: "calendar.badge.exclamationmark") {
                 Picker("", selection: $viewModel.dateFallback) {
                     ForEach(DateFallback.allCases, id: \.self) { f in
                         Text(f.rawValue).tag(f)

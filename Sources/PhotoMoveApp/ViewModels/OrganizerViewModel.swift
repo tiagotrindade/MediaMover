@@ -9,7 +9,7 @@ final class OrganizerViewModel {
 
     var sourceURL: URL?
     var destinationURL: URL?
-    var pattern: OrganizationPattern = .yearMonthDay
+    var pattern: OrganizationPattern = .yearMonthDayFlat
     var operationMode: OperationMode = .copy
     var includePhotos: Bool = true
     var includeVideos: Bool = true
@@ -19,7 +19,7 @@ final class OrganizerViewModel {
     var dateFallback: DateFallback = .creationDate
 
     // Video subfolder
-    var separateVideos: Bool = false
+    var separateVideos: Bool = true
 
     // Rename with date prefix
     var renameWithDate: Bool = false
@@ -28,7 +28,7 @@ final class OrganizerViewModel {
     var separateByCamera: Bool = false
 
     // Duplicate handling
-    var duplicateStrategy: DuplicateStrategy = .automatic
+    var duplicateStrategy: DuplicateStrategy = .ask
     var duplicateAction: DuplicateAction = .rename
 
     // Integrity verification
