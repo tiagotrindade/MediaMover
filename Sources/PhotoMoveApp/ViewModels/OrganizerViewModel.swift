@@ -14,6 +14,7 @@ final class OrganizerViewModel {
     var includePhotos: Bool = true
     var includeVideos: Bool = true
     var includeOtherFiles: Bool = false
+    var includeSubfolders: Bool = true
 
     // Date fallback
     var dateFallback: DateFallback = .creationDate
@@ -45,8 +46,16 @@ final class OrganizerViewModel {
     var totalFiles: Int = 0
     var currentFileName: String = ""
     var discoveredFiles: [MediaFile] = []
+    var previewItems: [MoverPreview] = []
     var result: OperationResult?
     var scanMessage: String = ""
+
+    struct MoverPreview: Identifiable {
+        let id = UUID()
+        let fileName: String
+        let destinationSubpath: String
+        let mediaType: MediaType?
+    }
     var canUndo: Bool = false
 
     // Duplicate ask dialog
@@ -96,7 +105,8 @@ final class OrganizerViewModel {
             in: source,
             includePhotos: includePhotos,
             includeVideos: includeVideos,
-            includeOtherFiles: includeOtherFiles
+            includeOtherFiles: includeOtherFiles,
+            includeSubfolders: includeSubfolders
         )
 
         totalFiles = urls.count
@@ -130,8 +140,53 @@ final class OrganizerViewModel {
         discoveredFiles = files.sorted {
             ($0.effectiveDate() ?? .distantPast) > ($1.effectiveDate() ?? .distantPast)
         }
+        generatePreview()
         isScanning = false
         scanMessage = ""
+    }
+
+    // MARK: - Preview Generation
+
+    func generatePreview() {
+        var previews: [MoverPreview] = []
+        for file in discoveredFiles {
+            let date = file.effectiveDate(fallback: dateFallback)
+            var subpath: String
+            if let date {
+                subpath = pattern.destinationSubpath(for: date, camera: file.cameraModel)
+                // Add video subfolder
+                if separateVideos && file.mediaType == .video {
+                    subpath += "/Videos"
+                }
+                // Add camera subfolder
+                if separateByCamera, let cam = file.cameraModel, !cam.isEmpty {
+                    let safeCam = cam.replacingOccurrences(of: "/", with: "_")
+                    subpath += "/\(safeCam)"
+                }
+            } else {
+                subpath = "No Date"
+            }
+
+            var fileName = file.fileName
+            if renameWithDate, let date {
+                let cal = Calendar.current
+                let y = cal.component(.year, from: date)
+                let mo = cal.component(.month, from: date)
+                let d = cal.component(.day, from: date)
+                let h = cal.component(.hour, from: date)
+                let mi = cal.component(.minute, from: date)
+                let s = cal.component(.second, from: date)
+                let prefix = String(format: "%04d%02d%02d_%02d%02d%02d", y, mo, d, h, mi, s)
+                fileName = "\(prefix)_\(file.fileName)"
+            }
+
+            previews.append(MoverPreview(
+                fileName: fileName,
+                destinationSubpath: subpath,
+                mediaType: file.mediaType
+            ))
+        }
+        previewItems = previews
     }
 
     // MARK: - Organize
@@ -280,6 +335,7 @@ final class OrganizerViewModel {
     func reset() {
         result = nil
         discoveredFiles = []
+        previewItems = []
         progress = 0
         currentFileIndex = 0
         currentFileName = ""

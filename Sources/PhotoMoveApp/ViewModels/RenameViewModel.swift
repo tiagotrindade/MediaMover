@@ -1,6 +1,11 @@
 import SwiftUI
 import AppKit
 
+enum RenameMode: String, CaseIterable, Sendable {
+    case renameInPlace = "Rename in place"
+    case copyToFolder = "Copy to folder"
+}
+
 @Observable
 @MainActor
 final class RenameViewModel {
@@ -8,10 +13,14 @@ final class RenameViewModel {
     // MARK: - Settings
 
     var sourceURL: URL?
+    var destinationURL: URL?
     var pattern: RenamePattern = .dateOriginalName
     var includePhotos: Bool = true
     var includeVideos: Bool = true
+    var includeOtherFiles: Bool = false
+    var includeSubfolders: Bool = true
     var dateFallback: DateFallback = .creationDate
+    var renameMode: RenameMode = .renameInPlace
 
     // MARK: - State
 
@@ -49,6 +58,17 @@ final class RenameViewModel {
         renameComplete = false
     }
 
+    func selectDestination() {
+        let panel = NSOpenPanel()
+        panel.title = "Select Destination Folder"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        destinationURL = url
+    }
+
     // MARK: - Scan + Preview
 
     func scanAndPreview() async {
@@ -61,7 +81,9 @@ final class RenameViewModel {
         let urls = FileEnumerator.enumerateMedia(
             in: source,
             includePhotos: includePhotos,
-            includeVideos: includeVideos
+            includeVideos: includeVideos,
+            includeOtherFiles: includeOtherFiles,
+            includeSubfolders: includeSubfolders
         )
 
         totalFiles = urls.count
@@ -89,20 +111,65 @@ final class RenameViewModel {
         discoveredFiles = files
 
         // Generate preview
-        var previews: [RenamePreview] = []
-        for (index, file) in files.enumerated() {
-            guard let date = file.effectiveDate(fallback: dateFallback) else { continue }
-            let newName = pattern.rename(
-                originalName: file.fileName,
-                date: date,
-                camera: file.cameraModel,
-                sequenceNumber: index + 1
-            )
-            previews.append(RenamePreview(originalName: file.fileName, newName: newName, file: file))
-        }
-        previewItems = previews
+        regeneratePreviewFromFiles(files)
 
         isScanning = false
+    }
+
+    // MARK: - Regenerate Preview (pattern change only, no rescan)
+
+    func regeneratePreview() {
+        regeneratePreviewFromFiles(discoveredFiles)
+    }
+
+    private func regeneratePreviewFromFiles(_ files: [MediaFile]) {
+        var previews: [RenamePreview] = []
+        // Track media vs other files separately for sequence numbering
+        var mediaSeq = 0
+        for file in files {
+            let isOther = file.mediaType == .other || file.mediaType == nil
+
+            if isOther {
+                // Other files: limited rename patterns (only date-based if date available)
+                let newName = renameOtherFile(file: file)
+                previews.append(RenamePreview(originalName: file.fileName, newName: newName, file: file))
+            } else {
+                mediaSeq += 1
+                guard let date = file.effectiveDate(fallback: dateFallback) else {
+                    // No date — keep original name
+                    previews.append(RenamePreview(originalName: file.fileName, newName: file.fileName, file: file))
+                    continue
+                }
+                let newName = pattern.rename(
+                    originalName: file.fileName,
+                    date: date,
+                    camera: file.cameraModel,
+                    sequenceNumber: mediaSeq
+                )
+                previews.append(RenamePreview(originalName: file.fileName, newName: newName, file: file))
+            }
+        }
+        previewItems = previews
+    }
+
+    /// Limited rename for non-media files: only date prefix + original name, using file dates
+    private func renameOtherFile(file: MediaFile) -> String {
+        guard let date = file.effectiveDate(fallback: dateFallback) else {
+            return file.fileName // no date available, keep original
+        }
+        let cal = Calendar.current
+        let y = cal.component(.year, from: date)
+        let mo = cal.component(.month, from: date)
+        let d = cal.component(.day, from: date)
+        let h = cal.component(.hour, from: date)
+        let mi = cal.component(.minute, from: date)
+        let s = cal.component(.second, from: date)
+
+        let ext = (file.fileName as NSString).pathExtension.lowercased()
+        let stem = (file.fileName as NSString).deletingPathExtension
+        let datePrefix = String(format: "%04d%02d%02d_%02d%02d%02d", y, mo, d, h, mi, s)
+        let newStem = "\(datePrefix)_\(stem)"
+        return ext.isEmpty ? newStem : "\(newStem).\(ext)"
     }
 
     // MARK: - Execute Rename
@@ -117,6 +184,12 @@ final class RenameViewModel {
         let fm = FileManager.default
         let total = previewItems.count
         let logger = ActivityLogger.shared
+        let isCopy = renameMode == .copyToFolder
+
+        // Create destination if needed
+        if isCopy, let dest = destinationURL {
+            try? fm.createDirectory(at: dest, withIntermediateDirectories: true)
+        }
 
         for (index, item) in previewItems.enumerated() {
             currentFileIndex = index + 1
@@ -124,11 +197,17 @@ final class RenameViewModel {
             currentFileName = item.originalName
             progress = Double(index + 1) / Double(total)
 
-            let dir = item.file.url.deletingLastPathComponent()
-            let newURL = dir.appendingPathComponent(item.newName)
+            let targetDir: URL
+            if isCopy, let dest = destinationURL {
+                targetDir = dest
+            } else {
+                targetDir = item.file.url.deletingLastPathComponent()
+            }
 
-            // Skip if name unchanged
-            guard item.originalName != item.newName else {
+            let newURL = targetDir.appendingPathComponent(item.newName)
+
+            // Skip if name unchanged and not copying
+            if !isCopy && item.originalName == item.newName {
                 renamedCount += 1
                 continue
             }
@@ -139,9 +218,15 @@ final class RenameViewModel {
                 if fm.fileExists(atPath: target.path) {
                     target = uniqueURL(for: target, fm: fm)
                 }
-                try fm.moveItem(at: item.file.url, to: target)
+
+                if isCopy {
+                    try fm.copyItem(at: item.file.url, to: target)
+                } else {
+                    try fm.moveItem(at: item.file.url, to: target)
+                }
                 renamedCount += 1
-                await logger.log(action: "rename", source: item.file.url.path, destination: target.path, status: .success)
+                let action = isCopy ? "rename-copy" : "rename"
+                await logger.log(action: action, source: item.file.url.path, destination: target.path, status: .success)
             } catch {
                 errorCount += 1
                 await logger.log(action: "rename", source: item.file.url.path, status: .error, details: error.localizedDescription)

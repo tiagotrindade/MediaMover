@@ -22,6 +22,11 @@ struct MainView: View {
                         patternRow
                         modeAndTypesRow
                         advancedSection
+
+                        // Preview after scan
+                        if !viewModel.previewItems.isEmpty && viewModel.result == nil {
+                            moverPreviewList
+                        }
                     }
                     .padding(20)
                 }
@@ -108,6 +113,20 @@ struct MainView: View {
                 viewModel.discoveredFiles = []
                 viewModel.result = nil
             }
+
+            // Subfolders toggle
+            VStack(spacing: 4) {
+                Toggle(isOn: $viewModel.includeSubfolders) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.questionmark")
+                            .font(.system(size: 10))
+                        Text("Subfolders")
+                            .font(.system(size: 11))
+                    }
+                }
+                .toggleStyle(.checkbox)
+            }
+            .frame(width: 110)
 
             Image(systemName: "arrow.right")
                 .font(.system(size: 14, weight: .medium))
@@ -317,6 +336,105 @@ struct MainView: View {
             }
         }
         .padding(.top, 8)
+    }
+
+    // MARK: - Mover Preview List
+
+    private var moverPreviewList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                let photos = viewModel.previewItems.filter { $0.mediaType == .photo }.count
+                let videos = viewModel.previewItems.filter { $0.mediaType == .video }.count
+                let other = viewModel.previewItems.filter { $0.mediaType == .other || $0.mediaType == nil }.count
+                let parts = [
+                    photos > 0 ? "\(photos) photos" : nil,
+                    videos > 0 ? "\(videos) videos" : nil,
+                    other > 0 ? "\(other) other" : nil,
+                ].compactMap { $0 }.joined(separator: " · ")
+
+                Text("Preview (\(parts))")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                Spacer()
+            }
+
+            VStack(spacing: 0) {
+                // Header row
+                HStack(spacing: 0) {
+                    Text("File")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .textCase(.uppercase)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.tertiary)
+                        .frame(width: 30)
+                    Text("Destination Folder")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.tertiary)
+                        .textCase(.uppercase)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+
+                Divider()
+
+                // Items (show first 200)
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(viewModel.previewItems.prefix(200).enumerated()), id: \.element.id) { index, item in
+                            HStack(spacing: 0) {
+                                // Type indicator
+                                let isVideo = item.mediaType == .video
+                                let isOther = item.mediaType == .other || item.mediaType == nil
+                                Image(systemName: isOther ? "doc" : (isVideo ? "video" : "photo"))
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(isOther ? .gray : (isVideo ? .purple : .blue))
+                                    .frame(width: 18)
+
+                                Text(item.fileName)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 9))
+                                    .foregroundStyle(Color.accentColor)
+                                    .frame(width: 30)
+
+                                Text(item.destinationSubpath + "/")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(1)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 5)
+                            .background(
+                                index % 2 == 0
+                                    ? Color.clear
+                                    : Color(NSColor.controlBackgroundColor).opacity(0.4)
+                            )
+                        }
+                    }
+                }
+                .frame(maxHeight: 200)
+
+                if viewModel.previewItems.count > 200 {
+                    Text("Showing 200 of \(viewModel.previewItems.count) files…")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .padding(8)
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(NSColor.controlBackgroundColor))
+            )
+        }
     }
 
     // MARK: - Bottom Bar
