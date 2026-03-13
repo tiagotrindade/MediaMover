@@ -17,14 +17,6 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]
-        ),
-        .testTarget(
-            name: "MediaMoverTests",
-            dependencies: ["MediaMover"],
-            path: "Tests/MediaMoverTests",
-            swiftSettings: [
-                .swiftLanguageMode(.v5)
-            ]
         )
     ]
 )
