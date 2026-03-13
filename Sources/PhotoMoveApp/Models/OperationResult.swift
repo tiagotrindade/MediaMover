@@ -1,6 +1,7 @@
 import Foundation
 
-struct OperationResult: Sendable {
+struct OperationResult: Sendable, Identifiable {
+    let id = UUID()
     var totalFiles: Int = 0
     var processedFiles: Int = 0
     var skippedDuplicates: Int = 0
