@@ -5,6 +5,7 @@ import SwiftUI
 struct MainView: View {
     @State private var viewModel = OrganizerViewModel()
     @State private var showAdvanced = false
+    @State private var discoveredFiles: [MediaFile] = []
 
     var body: some View {
         ZStack {
@@ -105,7 +106,7 @@ struct MainView: View {
                 color: .blue
             ) {
                 viewModel.selectSource()
-                viewModel.discoveredFiles = []
+                discoveredFiles = []
                 viewModel.result = nil
             }
 
@@ -324,17 +325,17 @@ struct MainView: View {
     private var bottomBar: some View {
         HStack(spacing: 12) {
             Button("Scan") {
-                Task { await viewModel.scanFiles() }
+                Task { discoveredFiles = await viewModel.scanFiles() }
             }
             .buttonStyle(SecondaryButtonStyle())
             .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isProcessing)
             .keyboardShortcut("r", modifiers: .command)
 
             // File count summary
-            if !viewModel.discoveredFiles.isEmpty {
-                let photos = viewModel.discoveredFiles.filter { $0.mediaType == .photo }.count
-                let videos = viewModel.discoveredFiles.filter { $0.mediaType == .video }.count
-                let other  = viewModel.discoveredFiles.filter { $0.mediaType == .other }.count
+            if !discoveredFiles.isEmpty {
+                let photos = discoveredFiles.filter { $0.mediaType == .photo }.count
+                let videos = discoveredFiles.filter { $0.mediaType == .video }.count
+                let other  = discoveredFiles.filter { $0.mediaType == .other }.count
                 let parts  = [
                     photos > 0 ? "\(photos) photos" : nil,
                     videos > 0 ? "\(videos) videos" : nil,
@@ -355,7 +356,7 @@ struct MainView: View {
             Spacer()
 
             Button {
-                Task { await viewModel.startOrganizing() }
+                Task { await viewModel.startOrganizing(files: discoveredFiles) }
             } label: {
                 HStack(spacing: 6) {
                     Text("Organize")
@@ -365,7 +366,7 @@ struct MainView: View {
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(
-                viewModel.discoveredFiles.isEmpty ||
+                discoveredFiles.isEmpty ||
                 viewModel.destinationURL == nil ||
                 viewModel.isProcessing ||
                 viewModel.isScanning
@@ -413,6 +414,10 @@ struct MainView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
+                    Button("Cancel") {
+                        viewModel.cancelOperation()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
                 }
             }
             .padding(32)
@@ -617,13 +622,10 @@ struct Badge: View {
     var body: some View {
         Text(text)
             .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(color)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(
-                Capsule()
-                    .fill(color.opacity(0.12))
-            )
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(color.cornerRadius(4))
     }
 }
 
@@ -708,10 +710,11 @@ struct DuplicateResolverSheet: View {
                 )
             }
 
-            Toggle("Apply to all remaining duplicates", isOn: $viewModel.applyDuplicateToAll)
+            Toggle("Remember this choice for all remaining duplicates in this session", isOn: $viewModel.applyDuplicateToAll)
                 .font(.system(size: 12))
                 .toggleStyle(.checkbox)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .help("If you select this, the app won't ask you again for other duplicates found in this same operation.")
 
             Divider()
 

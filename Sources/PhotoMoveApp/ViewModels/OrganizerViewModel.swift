@@ -40,11 +40,11 @@ final class OrganizerViewModel {
     var isScanning: Bool = false
     var isProcessing: Bool = false
     var isUndoing: Bool = false
+    var isCancelling: Bool = false
     var progress: Double = 0
     var currentFileIndex: Int = 0
     var totalFiles: Int = 0
     var currentFileName: String = ""
-    var discoveredFiles: [MediaFile] = []
     var result: OperationResult?
     var scanMessage: String = ""
     var canUndo: Bool = false
@@ -71,7 +71,6 @@ final class OrganizerViewModel {
     func selectSource() {
         if let url = pickFolder(title: "Select Source Folder") {
             sourceURL = url
-            discoveredFiles = []
             result = nil
         }
     }
@@ -85,10 +84,10 @@ final class OrganizerViewModel {
 
     // MARK: - Scan
 
-    func scanFiles() async {
-        guard let source = sourceURL else { return }
+    func scanFiles() async -> [MediaFile] {
+        guard let source = sourceURL else { return [] }
         isScanning = true
-        discoveredFiles = []
+        isCancelling = false
         result = nil
         scanMessage = "Scanning files..."
 
@@ -103,14 +102,16 @@ final class OrganizerViewModel {
         scanMessage = "Reading metadata for \(urls.count) files..."
 
         var files: [MediaFile] = []
-        let batchSize = 8
+        let batchSize = 20
 
         for batchStart in stride(from: 0, to: urls.count, by: batchSize) {
+            if isCancelling { break }
             let batchEnd = min(batchStart + batchSize, urls.count)
             let batch = Array(urls[batchStart..<batchEnd])
 
             let batchResults = await withTaskGroup(of: MediaFile?.self) { group in
                 for url in batch {
+                    if isCancelling { group.cancelAll(); break }
                     group.addTask {
                         await Self.buildMediaFile(from: url)
                     }
@@ -126,19 +127,25 @@ final class OrganizerViewModel {
             files.append(contentsOf: batchResults)
             scanMessage = "Read metadata: \(files.count) / \(urls.count)"
         }
-
-        discoveredFiles = files.sorted {
-            ($0.effectiveDate() ?? .distantPast) > ($1.effectiveDate() ?? .distantPast)
-        }
+        
         isScanning = false
         scanMessage = ""
+
+        if isCancelling {
+            return []
+        } else {
+            return files.sorted {
+                ($0.effectiveDate() ?? .distantPast) > ($1.effectiveDate() ?? .distantPast)
+            }
+        }
     }
 
     // MARK: - Organize
 
-    func startOrganizing() async {
-        guard !discoveredFiles.isEmpty, let destination = destinationURL else { return }
+    func startOrganizing(files: [MediaFile]) async {
+        guard !files.isEmpty, let destination = destinationURL else { return }
         isProcessing = true
+        isCancelling = false
         progress = 0
         currentFileIndex = 0
         result = nil
@@ -146,7 +153,6 @@ final class OrganizerViewModel {
         applyDuplicateToAll = false
 
         let organizer = FileOrganizer()
-        let files = discoveredFiles
 
         let config = OrganizerConfig(
             mode: operationMode,
@@ -171,6 +177,7 @@ final class OrganizerViewModel {
 
             // Otherwise ask the user
             guard let self else { return nil }
+            if self.isCancelling { return nil }
             return await self.askUserAboutDuplicate(
                 sourceName: sourceName,
                 sourceSize: sourceSize,
@@ -186,6 +193,7 @@ final class OrganizerViewModel {
             duplicateResolver: config.duplicateStrategy == .ask ? resolver : nil,
             progressCallback: { [weak self] current, total, fileName in
                 await MainActor.run {
+                    if self?.isCancelling == true { return }
                     self?.currentFileIndex = current
                     self?.totalFiles = total
                     self?.currentFileName = fileName
@@ -193,6 +201,15 @@ final class OrganizerViewModel {
                 }
             }
         )
+        
+        if isCancelling {
+            // Undo the partially completed operation
+            let (undone, errors) = await OperationHistory.shared.undoLastBatch()
+            undoMessage = "Operation cancelled. \(undone) files restored, \(errors) errors."
+            isProcessing = false
+            await refreshUndoState()
+            return
+        }
 
         // Save operation for undo
         if !records.isEmpty {
@@ -204,6 +221,14 @@ final class OrganizerViewModel {
         isProcessing = false
         await refreshUndoState()
     }
+    
+    func cancelOperation() {
+        isCancelling = true
+        // If we are in the duplicate dialog, cancel it
+        if showDuplicateDialog {
+            resolveDuplicate(action: nil)
+        }
+    }
 
     // MARK: - Undo
 
@@ -214,7 +239,7 @@ final class OrganizerViewModel {
         let (undone, errors) = await OperationHistory.shared.undoLastBatch()
 
         if errors > 0 {
-            undoMessage = "Undo complete: \(undone) files restored, \(errors) errors"
+            undoMessage = "Undo complete: \(undone) files restored, \(errors) errors. See Activity Log for details."
         } else {
             undoMessage = "Undo complete: \(undone) files restored successfully"
         }
@@ -279,7 +304,6 @@ final class OrganizerViewModel {
 
     func reset() {
         result = nil
-        discoveredFiles = []
         progress = 0
         currentFileIndex = 0
         currentFileName = ""
@@ -300,7 +324,13 @@ final class OrganizerViewModel {
 
     private static func buildMediaFile(from url: URL) async -> MediaFile? {
         let fm = FileManager.default
-        guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
+        let attrs: [FileAttributeKey: Any]
+        do {
+            attrs = try fm.attributesOfItem(atPath: url.path)
+        } catch {
+            await ActivityLogger.shared.log(action: "read_attributes", source: url.path, status: .error, details: error.localizedDescription)
+            return nil
+        }
 
         let modDate = (attrs[.modificationDate] as? Date) ?? Date()
         let creationDate = attrs[.creationDate] as? Date

@@ -16,6 +16,10 @@ struct RenameView: View {
                     Text("Mass Rename")
                         .font(.system(size: 15, weight: .semibold))
                     Spacer()
+                    Button("Reset") {
+                        viewModel.reset()
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
@@ -105,11 +109,6 @@ struct RenameView: View {
                 }
             }
         }
-        .onChange(of: viewModel.pattern) {
-            if !viewModel.discoveredFiles.isEmpty {
-                Task { await viewModel.scanAndPreview() }
-            }
-        }
     }
 
     // MARK: - Types Row
@@ -159,10 +158,10 @@ struct RenameView: View {
 
                 Divider()
 
-                // Items (show first 200)
+                // Items
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(viewModel.previewItems.prefix(200)) { item in
+                        ForEach(viewModel.previewItems) { item in
                             HStack(spacing: 0) {
                                 Text(item.originalName)
                                     .font(.system(size: 11))
@@ -191,14 +190,7 @@ struct RenameView: View {
                         }
                     }
                 }
-                .frame(maxHeight: 250)
-
-                if viewModel.previewItems.count > 200 {
-                    Text("Showing 200 of \(viewModel.previewItems.count) files…")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .padding(8)
-                }
+                .frame(maxHeight: .infinity)
             }
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -221,10 +213,6 @@ struct RenameView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Button("Reset") {
-                viewModel.reset()
-            }
-            .buttonStyle(SecondaryButtonStyle())
         }
         .padding(14)
         .background(
@@ -242,7 +230,10 @@ struct RenameView: View {
     private var bottomBar: some View {
         HStack(spacing: 12) {
             Button("Scan & Preview") {
-                Task { await viewModel.scanAndPreview() }
+                Task {
+                    let previews = await viewModel.scanAndPreview()
+                    viewModel.previewItems = previews
+                }
             }
             .buttonStyle(SecondaryButtonStyle())
             .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isRenaming)
@@ -261,7 +252,7 @@ struct RenameView: View {
             Spacer()
 
             Button {
-                Task { await viewModel.executeRename() }
+                Task { await viewModel.executeRename(items: viewModel.previewItems) }
             } label: {
                 HStack(spacing: 6) {
                     Text("Rename All")
@@ -303,6 +294,11 @@ struct RenameView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.tertiary)
                 }
+                
+                Button("Cancel") {
+                    viewModel.cancelOperation()
+                }
+                .buttonStyle(SecondaryButtonStyle())
             }
             .padding(32)
             .background(

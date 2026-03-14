@@ -17,11 +17,11 @@ final class RenameViewModel {
 
     var isScanning: Bool = false
     var isRenaming: Bool = false
+    var isCancelling: Bool = false
     var progress: Double = 0
     var currentFileIndex: Int = 0
     var totalFiles: Int = 0
     var currentFileName: String = ""
-    var discoveredFiles: [MediaFile] = []
     var previewItems: [RenamePreview] = []
     var renameComplete: Bool = false
     var renamedCount: Int = 0
@@ -44,17 +44,15 @@ final class RenameViewModel {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         sourceURL = url
-        discoveredFiles = []
-        previewItems = []
-        renameComplete = false
+        reset()
     }
 
     // MARK: - Scan + Preview
 
-    func scanAndPreview() async {
-        guard let source = sourceURL else { return }
+    func scanAndPreview() async -> [RenamePreview] {
+        guard let source = sourceURL else { return [] }
         isScanning = true
-        discoveredFiles = []
+        isCancelling = false
         previewItems = []
         renameComplete = false
 
@@ -67,26 +65,33 @@ final class RenameViewModel {
         totalFiles = urls.count
 
         var files: [MediaFile] = []
-        let batchSize = 8
+        let batchSize = 20
 
         for batchStart in stride(from: 0, to: urls.count, by: batchSize) {
+            if isCancelling { break }
             let batchEnd = min(batchStart + batchSize, urls.count)
             let batch = Array(urls[batchStart..<batchEnd])
 
             let batchResults = await withTaskGroup(of: MediaFile?.self) { group in
                 for url in batch {
+                    if isCancelling { group.cancelAll(); break }
                     group.addTask { await Self.buildMediaFile(from: url) }
                 }
                 var results: [MediaFile] = []
                 for await mf in group { if let mf { results.append(mf) } }
                 return results
             }
+            if isCancelling { break }
             files.append(contentsOf: batchResults)
         }
 
+        if isCancelling {
+            isScanning = false
+            return []
+        }
+        
         // Sort by date
         files.sort { ($0.effectiveDate(fallback: dateFallback) ?? .distantPast) < ($1.effectiveDate(fallback: dateFallback) ?? .distantPast) }
-        discoveredFiles = files
 
         // Generate preview
         var previews: [RenamePreview] = []
@@ -100,25 +105,28 @@ final class RenameViewModel {
             )
             previews.append(RenamePreview(originalName: file.fileName, newName: newName, file: file))
         }
-        previewItems = previews
-
+        
         isScanning = false
+        return previews
     }
 
     // MARK: - Execute Rename
 
-    func executeRename() async {
-        guard !previewItems.isEmpty else { return }
+    func executeRename(items: [RenamePreview]) async {
+        guard !items.isEmpty else { return }
         isRenaming = true
+        isCancelling = false
         progress = 0
         renamedCount = 0
         errorCount = 0
 
         let fm = FileManager.default
-        let total = previewItems.count
+        let total = items.count
         let logger = ActivityLogger.shared
 
-        for (index, item) in previewItems.enumerated() {
+        for (index, item) in items.enumerated() {
+            if isCancelling { break }
+            
             currentFileIndex = index + 1
             totalFiles = total
             currentFileName = item.originalName
@@ -149,18 +157,26 @@ final class RenameViewModel {
         }
 
         isRenaming = false
-        renameComplete = true
+        if !isCancelling {
+            renameComplete = true
+        }
+    }
+    
+    func cancelOperation() {
+        isCancelling = true
     }
 
     // MARK: - Reset
 
     func reset() {
-        discoveredFiles = []
         previewItems = []
         renameComplete = false
         renamedCount = 0
         errorCount = 0
         progress = 0
+        isScanning = false
+        isRenaming = false
+        isCancelling = false
     }
 
     // MARK: - Private
@@ -181,7 +197,14 @@ final class RenameViewModel {
 
     private static func buildMediaFile(from url: URL) async -> MediaFile? {
         let fm = FileManager.default
-        guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
+        let attrs: [FileAttributeKey: Any]
+        do {
+            attrs = try fm.attributesOfItem(atPath: url.path)
+        } catch {
+            await ActivityLogger.shared.log(action: "read_attributes", source: url.path, status: .error, details: error.localizedDescription)
+            return nil
+        }
+
         let modDate = (attrs[.modificationDate] as? Date) ?? Date()
         let creationDate = attrs[.creationDate] as? Date
         let fileSize = (attrs[.size] as? Int64) ?? 0
