@@ -1,6 +1,6 @@
 # MediaMover
 
-A native macOS app to organize photos, videos, and other files into folders based on EXIF metadata or file dates. Inspired by PhotoMove2, with full video, RAW format, and non-media file support.
+A native macOS app to organize and rename photos, videos, and other files based on EXIF metadata or file dates. Inspired by PhotoMove2, with full video, RAW format, non-media file support, and a built-in Mass Rename tool.
 
 ## Download
 
@@ -8,17 +8,22 @@ A native macOS app to organize photos, videos, and other files into folders base
 
 ## Features
 
-### Media Organization
+### Media Organization (Mover)
 - **EXIF-based sorting** — reads DateTaken from photo EXIF data
 - **Video metadata** — reads creation date from MOV, MP4, MKV and other formats
 - **7 folder patterns** — YYYY/MM/DD, YYYY/MM, YYYY_MM_DD, with camera model variants
 - **Copy or Move mode** — choose whether to keep or move originals
 - **Non-media files** — optionally include documents, archives, and any other file types
+- **Preview before organizing** — scan files and review how they'll be sorted before committing
+- **Subfolder toggle** — include or exclude subfolders from the source directory
 
 ### Date Handling
+- **EXIF date chain**: DateTimeOriginal → DateTimeDigitized → TIFFDateTime (supports scanned photos)
+- **Subsecond precision**: parses EXIF dates with milliseconds (e.g. Nikon, Sony cameras)
 - **File Creation Date** fallback (default) when no EXIF/metadata is found
 - **File Modification Date** fallback as alternative
 - **Skip** files with no metadata date available
+- **UTC-consistent** folder sorting — dates are interpreted in UTC to avoid timezone drift
 
 ### File Renaming
 - **Rename with date** — prepend full timestamp to filenames
@@ -30,11 +35,20 @@ A native macOS app to organize photos, videos, and other files into folders base
 - **Videos subfolder** — separate videos into a `Videos` subfolder (e.g. `2026/03/12/Videos/`)
 - Both options can be combined with any folder pattern
 
+### Mass Rename
+- **7 naming patterns** — Date prefix, Date-Time prefix, Sequential numbering, Camera model prefix, and more
+- **Live preview** — see before/after filenames before applying
+- **Rename in place or copy** — rename files where they are, or copy renamed files to a new folder
+- **Subfolder toggle** — include or exclude subfolders
+- **Other Files support** — include non-media files with sequential numbering
+- **Batch processing** — rename hundreds of files in seconds
+
 ### Integrity Verification
-- **Post-copy checksum** verification enabled by default
+- **Post-copy/move checksum** verification enabled by default
 - **XXHash64** — fast hashing for large batches
 - **SHA-256** — option for maximum security
-- Detects corrupted copies immediately after transfer
+- Detects corrupted files immediately after transfer
+- **Move mode**: source hash is computed before the move and compared after — no false positives
 
 ### Duplicate Detection
 - **Ask Each Time** — per-file dialog: rename, replace, replace if larger, or skip (with "apply to all" option)
@@ -85,21 +99,31 @@ make dmg
 
 ## Usage
 
+### Mover (Organize files into folders)
 1. Select a **source folder** containing photos/videos/files
 2. Select a **destination folder**
 3. Choose a folder pattern (e.g., YYYY/MM/DD)
 4. Configure options:
    - **Mode**: Copy or Move
    - **File types**: Photos, Videos, Other Files
+   - **Subfolders**: Include subfolders toggle
    - **Duplicates**: Ask, Automatic, or Skip
    - **Date fallback**: Creation date, Modification date, or Skip
    - **Subfolders**: Videos subfolder, Camera subfolder
    - **Rename**: Prepend date/time to filenames
    - **Integrity**: XXHash64 or SHA-256 verification
-5. Click **Scan** to discover files and read metadata
+5. Click **Scan** to preview how files will be organized
 6. Click **Organize** to start
 
 Use the **undo button** (↩) to reverse the last operation, or the **log button** (📋) to review activity history.
+
+### Mass Rename (Batch rename files)
+1. Select a **source folder**
+2. Choose a **naming pattern** (e.g., Date prefix, Sequential)
+3. Optionally enable **Include Subfolders** and **Other Files**
+4. Choose **Rename in Place** or **Copy to Folder**
+5. Preview the before/after filenames
+6. Click **Rename** to apply
 
 ## License
 

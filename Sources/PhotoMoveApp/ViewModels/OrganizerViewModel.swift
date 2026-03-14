@@ -14,6 +14,7 @@ final class OrganizerViewModel {
     var includePhotos: Bool = true
     var includeVideos: Bool = true
     var includeOtherFiles: Bool = false
+    var includeSubfolders: Bool = true
 
     // Date fallback
     var dateFallback: DateFallback = .creationDate
@@ -47,6 +48,7 @@ final class OrganizerViewModel {
     var currentFileName: String = ""
     var result: OperationResult?
     var scanMessage: String = ""
+
     var canUndo: Bool = false
 
     // Duplicate ask dialog
@@ -95,7 +97,8 @@ final class OrganizerViewModel {
             in: source,
             includePhotos: includePhotos,
             includeVideos: includeVideos,
-            includeOtherFiles: includeOtherFiles
+            includeOtherFiles: includeOtherFiles,
+            includeSubfolders: includeSubfolders
         )
 
         totalFiles = urls.count

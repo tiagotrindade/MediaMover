@@ -6,7 +6,8 @@ struct FileEnumerator: Sendable {
         in directory: URL,
         includePhotos: Bool,
         includeVideos: Bool,
-        includeOtherFiles: Bool = false
+        includeOtherFiles: Bool = false,
+        includeSubfolders: Bool = true
     ) -> [URL] {
         var allowedExtensions = Set<String>()
         if includePhotos { allowedExtensions.formUnion(SupportedFormats.photoExtensions) }
@@ -17,29 +18,51 @@ struct FileEnumerator: Sendable {
 
         let fm = FileManager.default
         let keys: [URLResourceKey] = [.isRegularFileKey, .contentModificationDateKey, .creationDateKey, .fileSizeKey]
-        guard let enumerator = fm.enumerator(
-            at: directory,
-            includingPropertiesForKeys: keys,
-            options: [.skipsHiddenFiles, .skipsPackageDescendants]
-        ) else {
-            return []
-        }
-
         let allMediaExtensions = SupportedFormats.allExtensions
         var results: [URL] = []
 
-        for case let fileURL as URL in enumerator {
-            guard let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
-                  resourceValues.isRegularFile == true else { continue }
+        if includeSubfolders {
+            guard let enumerator = fm.enumerator(
+                at: directory,
+                includingPropertiesForKeys: keys,
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            ) else {
+                return []
+            }
 
-            let ext = fileURL.pathExtension.lowercased()
+            for case let fileURL as URL in enumerator {
+                guard let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
+                      resourceValues.isRegularFile == true else { continue }
 
-            if allowedExtensions.contains(ext) {
-                // It's a selected media type
-                results.append(fileURL)
-            } else if includeOtherFiles && !allMediaExtensions.contains(ext) {
-                // It's a non-media file and user wants those included
-                results.append(fileURL)
+                let ext = fileURL.pathExtension.lowercased()
+
+                if allowedExtensions.contains(ext) {
+                    results.append(fileURL)
+                } else if includeOtherFiles && !allMediaExtensions.contains(ext) {
+                    results.append(fileURL)
+                }
+            }
+        } else {
+            // Only top-level files in the directory
+            guard let contents = try? fm.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: keys,
+                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+            ) else {
+                return []
+            }
+
+            for fileURL in contents {
+                guard let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
+                      resourceValues.isRegularFile == true else { continue }
+
+                let ext = fileURL.pathExtension.lowercased()
+
+                if allowedExtensions.contains(ext) {
+                    results.append(fileURL)
+                } else if includeOtherFiles && !allMediaExtensions.contains(ext) {
+                    results.append(fileURL)
+                }
             }
         }
 
