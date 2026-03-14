@@ -12,8 +12,7 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "MediaMover",
-            path: "Sources/PhotoMoveApp",
+            name: "MediaMover", // O código fonte está agora em "MediaMover/"
             swiftSettings: [
                 .swiftLanguageMode(.v5)
             ]
