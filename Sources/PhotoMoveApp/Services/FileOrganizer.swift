@@ -66,7 +66,7 @@ actor FileOrganizer {
             // Determine the effective date using the configured fallback
             guard let effectiveDate = file.effectiveDate(fallback: config.dateFallback) else {
                 // No date available and user chose "no fallback" — skip this file
-                result.skippedDuplicates += 1
+                result.skippedNoDate += 1
                 result.processedFiles += 1
                 await logger.log(action: "skip", source: file.url.path, status: .warning, details: "No date available (metadata or file date)")
                 continue
@@ -75,7 +75,9 @@ actor FileOrganizer {
             var subpath = config.pattern.destinationSubpath(for: effectiveDate, camera: file.cameraModel)
 
             // Add camera subfolder if enabled and camera info is available
-            if config.separateByCamera, let camera = file.cameraModel, !camera.isEmpty {
+            // BUG-03 FIX: Skip if the pattern already includes camera in the path
+            if config.separateByCamera, !config.pattern.includesCamera,
+               let camera = file.cameraModel, !camera.isEmpty {
                 let safeCam = sanitizeFolderName(camera)
                 subpath += "/\(safeCam)"
             }
@@ -145,12 +147,28 @@ actor FileOrganizer {
                         targetURL = uniqueURL(for: targetURL, fm: fm)
 
                     case .overwrite:
-                        try? fm.removeItem(at: targetURL)
+                        do {
+                            try fm.removeItem(at: targetURL)
+                        } catch {
+                            let msg = "Failed to remove existing file for overwrite: \(error.localizedDescription)"
+                            result.errors.append((file: file.fileName, error: msg))
+                            result.processedFiles += 1
+                            await logger.log(action: "error", source: targetURL.path, status: .error, details: msg)
+                            continue
+                        }
 
                     case .overwriteIfLarger:
                         let existingSize = (try? fm.attributesOfItem(atPath: targetURL.path)[.size] as? Int64) ?? 0
                         if file.fileSize > existingSize {
-                            try? fm.removeItem(at: targetURL)
+                            do {
+                                try fm.removeItem(at: targetURL)
+                            } catch {
+                                let msg = "Failed to remove existing file for overwrite: \(error.localizedDescription)"
+                                result.errors.append((file: file.fileName, error: msg))
+                                result.processedFiles += 1
+                                await logger.log(action: "error", source: targetURL.path, status: .error, details: msg)
+                                continue
+                            }
                         } else {
                             result.skippedDuplicates += 1
                             result.processedFiles += 1
@@ -163,6 +181,12 @@ actor FileOrganizer {
 
             // MARK: Copy/Move
             do {
+                // BUG-01 FIX: Pre-compute source hash BEFORE move (original is destroyed by move)
+                var preMoveHash: String?
+                if config.verifyIntegrity && config.mode == .move {
+                    preMoveHash = try FileHashing.hash(of: file.url, algorithm: config.hashAlgorithm)
+                }
+
                 switch config.mode {
                 case .copy:
                     try fm.copyItem(at: file.url, to: targetURL)
@@ -191,10 +215,11 @@ actor FileOrganizer {
                 if config.verifyIntegrity {
                     do {
                         let verified = try verifyIntegrity(
-                            source: config.mode == .copy ? file.url : targetURL,
+                            source: file.url,
                             destination: targetURL,
                             mode: config.mode,
-                            algorithm: config.hashAlgorithm
+                            algorithm: config.hashAlgorithm,
+                            preComputedSourceHash: preMoveHash
                         )
                         if verified {
                             result.verifiedFiles += 1
@@ -228,16 +253,19 @@ actor FileOrganizer {
 
     // MARK: - Integrity Verification
 
-    private func verifyIntegrity(source: URL, destination: URL, mode: OperationMode, algorithm: HashAlgorithm) throws -> Bool {
+    private func verifyIntegrity(source: URL, destination: URL, mode: OperationMode, algorithm: HashAlgorithm, preComputedSourceHash: String? = nil) throws -> Bool {
+        let destHash = try FileHashing.hash(of: destination, algorithm: algorithm)
+
         if mode == .move {
-            // For moves, source no longer exists — we can only verify the destination is readable
-            _ = try FileHashing.hash(of: destination, algorithm: algorithm)
-            return true
+            // For moves, compare against pre-computed hash (calculated before source was destroyed)
+            guard let sourceHash = preComputedSourceHash else {
+                return false // No pre-computed hash available — cannot verify
+            }
+            return sourceHash == destHash
         }
 
         // For copies, compare source and destination hashes
         let sourceHash = try FileHashing.hash(of: source, algorithm: algorithm)
-        let destHash = try FileHashing.hash(of: destination, algorithm: algorithm)
         return sourceHash == destHash
     }
 
@@ -245,7 +273,8 @@ actor FileOrganizer {
 
     /// Generates a date prefix like "20260312_143522123_"
     private func datePrefix(for date: Date) -> String {
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
         let y = cal.component(.year, from: date)
         let mo = cal.component(.month, from: date)
         let d = cal.component(.day, from: date)

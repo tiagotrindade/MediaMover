@@ -18,9 +18,12 @@ A native macOS app to organize and rename photos, videos, and other files based 
 - **Subfolder toggle** — include or exclude subfolders from the source directory
 
 ### Date Handling
+- **EXIF date chain**: DateTimeOriginal → DateTimeDigitized → TIFFDateTime (supports scanned photos)
+- **Subsecond precision**: parses EXIF dates with milliseconds (e.g. Nikon, Sony cameras)
 - **File Creation Date** fallback (default) when no EXIF/metadata is found
 - **File Modification Date** fallback as alternative
 - **Skip** files with no metadata date available
+- **UTC-consistent** folder sorting — dates are interpreted in UTC to avoid timezone drift
 
 ### File Renaming
 - **Rename with date** — prepend full timestamp to filenames
@@ -41,10 +44,11 @@ A native macOS app to organize and rename photos, videos, and other files based 
 - **Batch processing** — rename hundreds of files in seconds
 
 ### Integrity Verification
-- **Post-copy checksum** verification enabled by default
+- **Post-copy/move checksum** verification enabled by default
 - **XXHash64** — fast hashing for large batches
 - **SHA-256** — option for maximum security
-- Detects corrupted copies immediately after transfer
+- Detects corrupted files immediately after transfer
+- **Move mode**: source hash is computed before the move and compared after — no false positives
 
 ### Duplicate Detection
 - **Ask Each Time** — per-file dialog: rename, replace, replace if larger, or skip (with "apply to all" option)

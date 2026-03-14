@@ -17,9 +17,18 @@ struct MetadataExtractor: Sendable {
         var dateTaken: Date?
         var cameraModel: String?
 
-        // EXIF date
-        if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
-           let dateString = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
+        // EXIF date — BUG-META-01 FIX: fallback chain DateTimeOriginal → DateTimeDigitized → TIFFDateTime
+        if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any] {
+            if let dateString = exif[kCGImagePropertyExifDateTimeOriginal] as? String {
+                dateTaken = parseExifDate(dateString)
+            }
+            if dateTaken == nil, let dateString = exif[kCGImagePropertyExifDateTimeDigitized] as? String {
+                dateTaken = parseExifDate(dateString)
+            }
+        }
+        if dateTaken == nil,
+           let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any],
+           let dateString = tiff[kCGImagePropertyTIFFDateTime] as? String {
             dateTaken = parseExifDate(dateString)
         }
 
@@ -67,10 +76,26 @@ struct MetadataExtractor: Sendable {
 
     // MARK: - Helpers
 
-    private static func parseExifDate(_ string: String) -> Date? {
+    // BUG-META-03 FIX: Static formatters to avoid re-creating on every call
+    private static let exifDateFormatterWithSubseconds: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy:MM:dd HH:mm:ss.SSS"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    private static let exifDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy:MM:dd HH:mm:ss"
         formatter.locale = Locale(identifier: "en_US_POSIX")
-        return formatter.date(from: string)
+        return formatter
+    }()
+
+    // BUG-META-02 FIX: Try subseconds first, then standard format
+    private static func parseExifDate(_ string: String) -> Date? {
+        if let date = exifDateFormatterWithSubseconds.date(from: string) {
+            return date
+        }
+        return exifDateFormatter.date(from: string)
     }
 }

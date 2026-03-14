@@ -11,6 +11,16 @@ enum OrganizationPattern: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
+    /// Whether this pattern already includes camera model in the path
+    var includesCamera: Bool {
+        switch self {
+        case .yearMonthDayCamera, .yearMonthCamera, .cameraYearMonthDay:
+            return true
+        default:
+            return false
+        }
+    }
+
     var displayName: String {
         switch self {
         case .yearMonthDay:        return "YYYY / MM / DD"
@@ -28,7 +38,8 @@ enum OrganizationPattern: String, CaseIterable, Identifiable, Sendable {
     }
 
     func destinationSubpath(for date: Date, camera: String?) -> String {
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
         let year = String(format: "%04d", cal.component(.year, from: date))
         let month = String(format: "%02d", cal.component(.month, from: date))
         let day = String(format: "%02d", cal.component(.day, from: date))

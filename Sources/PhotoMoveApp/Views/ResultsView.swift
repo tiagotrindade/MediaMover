@@ -38,6 +38,12 @@ struct ResultsView: View {
                         Text("\(result.skippedDuplicates)").monospacedDigit().foregroundStyle(.orange)
                     }
                 }
+                if result.skippedNoDate > 0 {
+                    GridRow {
+                        Text("Skipped (no date):")
+                        Text("\(result.skippedNoDate)").monospacedDigit().foregroundStyle(.orange)
+                    }
+                }
                 if !result.errors.isEmpty {
                     GridRow {
                         Text("Errors:")
