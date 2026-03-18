@@ -134,12 +134,12 @@ final class RenameViewModel {
                 let newName = renameOtherFile(file: file)
                 previews.append(RenamePreview(originalName: file.fileName, newName: newName, file: file))
             } else {
-                mediaSeq += 1
                 guard let date = file.effectiveDate(fallback: dateFallback) else {
                     // No date — keep original name
                     previews.append(RenamePreview(originalName: file.fileName, newName: file.fileName, file: file))
                     continue
                 }
+                mediaSeq += 1
                 let newName = pattern.rename(
                     originalName: file.fileName,
                     date: date,
@@ -208,7 +208,6 @@ final class RenameViewModel {
 
             // Skip if name unchanged and not copying
             if !isCopy && item.originalName == item.newName {
-                renamedCount += 1
                 continue
             }
 

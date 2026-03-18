@@ -77,7 +77,7 @@ struct ResultsView: View {
                 DisclosureGroup("Error Details") {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 2) {
-                            ForEach(result.errors.prefix(50), id: \.file) { err in
+                            ForEach(Array(result.errors.prefix(50).enumerated()), id: \.offset) { _, err in
                                 Text("\(err.file): \(err.error)")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
@@ -93,7 +93,7 @@ struct ResultsView: View {
                 DisclosureGroup("Integrity Verification Issues") {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 2) {
-                            ForEach(result.verificationErrors.prefix(50), id: \.file) { err in
+                            ForEach(Array(result.verificationErrors.prefix(50).enumerated()), id: \.offset) { _, err in
                                 HStack(spacing: 4) {
                                     Image(systemName: "exclamationmark.triangle")
                                         .foregroundStyle(.orange)

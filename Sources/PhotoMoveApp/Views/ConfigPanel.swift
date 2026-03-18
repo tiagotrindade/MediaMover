@@ -4,15 +4,19 @@ struct ConfigPanel: View {
     @Bindable var viewModel: OrganizerViewModel
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 18) {
-                destinationSection
-                folderStructureSection
-                fileHandlingSection
-                safetySection
-                metadataSection
+        VStack(spacing: 0) {
+            destinationSection
+                .padding(14)
+            Divider()
+            ScrollView {
+                VStack(spacing: 18) {
+                    folderStructureSection
+                    fileHandlingSection
+                    safetySection
+                    metadataSection
+                }
+                .padding(14)
             }
-            .padding(14)
         }
         .background(Color(NSColor.windowBackgroundColor))
         .onChange(of: viewModel.renameWithDate)    { viewModel.generatePreview() }

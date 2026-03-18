@@ -154,14 +154,15 @@ final class OrganizerViewModel {
             var subpath: String
             if let date {
                 subpath = pattern.destinationSubpath(for: date, camera: file.cameraModel)
+                // Add camera subfolder (must come before Videos to match FileOrganizer order)
+                if separateByCamera, !pattern.includesCamera, let cam = file.cameraModel, !cam.isEmpty {
+                    let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|")
+                    let safeCam = cam.components(separatedBy: illegal).joined(separator: "_").trimmingCharacters(in: .whitespaces)
+                    subpath += "/\(safeCam)"
+                }
                 // Add video subfolder
                 if separateVideos && file.mediaType == .video {
                     subpath += "/Videos"
-                }
-                // Add camera subfolder
-                if separateByCamera, let cam = file.cameraModel, !cam.isEmpty {
-                    let safeCam = cam.replacingOccurrences(of: "/", with: "_")
-                    subpath += "/\(safeCam)"
                 }
             } else {
                 subpath = "No Date"
@@ -169,14 +170,16 @@ final class OrganizerViewModel {
 
             var fileName = file.fileName
             if renameWithDate, let date {
-                let cal = Calendar.current
+                var cal = Calendar(identifier: .gregorian)
+                cal.timeZone = TimeZone(identifier: "UTC")!
                 let y = cal.component(.year, from: date)
                 let mo = cal.component(.month, from: date)
                 let d = cal.component(.day, from: date)
                 let h = cal.component(.hour, from: date)
                 let mi = cal.component(.minute, from: date)
                 let s = cal.component(.second, from: date)
-                let prefix = String(format: "%04d%02d%02d_%02d%02d%02d", y, mo, d, h, mi, s)
+                let ms = cal.component(.nanosecond, from: date) / 1_000_000
+                let prefix = String(format: "%04d%02d%02d_%02d%02d%02d%03d", y, mo, d, h, mi, s, ms)
                 fileName = "\(prefix)_\(file.fileName)"
             }
 

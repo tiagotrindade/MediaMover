@@ -5,6 +5,7 @@ struct ActivityView: View {
 
     @State private var filterText: String = ""
     @State private var filterStatus: LogStatus? = nil
+    @State private var showNoLogAlert: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,6 +20,11 @@ struct ActivityView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(NSColor.windowBackgroundColor))
         .task { await organizerVM.loadLog() }
+        .alert("No Activity Recorded", isPresented: $showNoLogAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("No activity has been logged yet. Organize or rename files first.")
+        }
     }
 
     // MARK: - Toolbar
@@ -53,7 +59,11 @@ struct ActivityView: View {
             Button {
                 Task {
                     if let url = await organizerVM.exportLogFile() {
-                        NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
+                        if FileManager.default.fileExists(atPath: url.path) {
+                            NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
+                        } else {
+                            showNoLogAlert = true
+                        }
                     }
                 }
             } label: {

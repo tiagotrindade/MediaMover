@@ -146,14 +146,6 @@ actor OperationHistory {
         }
     }
 
-    private func loadFromDisk() {
-        guard let data = try? Data(contentsOf: historyURL),
-              let decoded = try? JSONDecoder().decode([BatchOperation].self, from: data) else {
-            return
-        }
-        batches = decoded
-    }
-
     private func saveToDisk() {
         guard let data = try? JSONEncoder().encode(batches) else { return }
         try? data.write(to: historyURL)

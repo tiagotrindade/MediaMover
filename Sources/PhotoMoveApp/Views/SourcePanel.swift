@@ -41,8 +41,6 @@ struct SourcePanel: View {
     private var folderPicker: some View {
         Button {
             viewModel.selectSource()
-            viewModel.discoveredFiles = []
-            viewModel.result = nil
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "folder")
@@ -127,7 +125,7 @@ struct SourcePanel: View {
             }
             .buttonStyle(SecondaryButtonStyle())
             .controlSize(.small)
-            .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isProcessing)
+            .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isProcessing || viewModel.isUndoing)
         }
         .padding(.horizontal, 12).padding(.vertical, 10)
     }
@@ -155,18 +153,13 @@ struct SourceFileRow: View {
 
     @ViewBuilder
     private var fileIcon: some View {
-        let rawExts = ["nef", "arw", "cr2", "cr3", "orf", "rw2", "dng", "raf"]
         switch file.mediaType {
         case .photo:
             Image(systemName: "photo").foregroundStyle(Color.blue)
         case .video:
             Image(systemName: "film").foregroundStyle(Color.green)
         case .other:
-            if rawExts.contains(file.fileExtension) {
-                Image(systemName: "doc").foregroundStyle(Color.purple)
-            } else {
-                Image(systemName: "doc.text").foregroundStyle(Color.gray)
-            }
+            Image(systemName: "doc.text").foregroundStyle(Color.gray)
         }
     }
 }
