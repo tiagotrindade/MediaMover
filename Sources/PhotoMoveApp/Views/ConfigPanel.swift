@@ -5,11 +5,13 @@ struct ConfigPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            destinationSection
-                .padding(14)
+            sectionHeader("Destination")
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
             Divider()
             ScrollView {
                 VStack(spacing: 18) {
+                    destinationCard
                     folderStructureSection
                     fileHandlingSection
                     safetySection
@@ -42,12 +44,10 @@ struct ConfigPanel: View {
 
     // MARK: - Destination
 
-    private var destinationSection: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            sectionHeader("Destination")
-            Button {
-                viewModel.selectDestination()
-            } label: {
+    private var destinationCard: some View {
+        Button {
+            viewModel.selectDestination()
+        } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "folder.badge.plus")
                         .font(.system(size: 13)).foregroundStyle(.green).frame(width: 20)
@@ -71,7 +71,6 @@ struct ConfigPanel: View {
                 )
             }
             .buttonStyle(.plain)
-        }
     }
 
     // MARK: - Folder Structure
