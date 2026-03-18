@@ -1,374 +1,360 @@
 import SwiftUI
 
 struct RenameView: View {
-    @State private var viewModel = RenameViewModel()
+    @Bindable var viewModel: RenameViewModel
 
     var body: some View {
-        ZStack {
-            Color(NSColor.windowBackgroundColor).ignoresSafeArea()
+        HStack(spacing: 0) {
+            // Left: source files
+            RenameSourcePanel(viewModel: viewModel)
+                .frame(minWidth: 180, maxWidth: 300)
 
-            VStack(spacing: 0) {
-                // Header
-                HStack(spacing: 8) {
-                    Image(systemName: "pencil.and.list.clipboard")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                    Text("Mass Rename")
-                        .font(.system(size: 15, weight: .semibold))
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
+            Divider()
 
-                Divider()
+            // Center: config
+            RenameConfigPanel(viewModel: viewModel)
+                .frame(minWidth: 250, maxWidth: 380)
 
-                ScrollView {
-                    VStack(spacing: 16) {
-                        // Folder cards
-                        folderSection
-                        // Pattern picker
-                        patternSection
-                        // File types + options
-                        optionsRow
-                        // Preview list
-                        if !viewModel.previewItems.isEmpty {
-                            previewList
-                        }
-                        // Complete message
-                        if viewModel.renameComplete {
-                            completeMessage
-                        }
+            Divider()
+
+            // Right: preview
+            RenamePreviewPanel(viewModel: viewModel)
+                .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await viewModel.executeRename() }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(viewModel.renameMode == .copyToFolder ? "Copy & Rename" : "Rename All")
+                        Image(systemName: viewModel.renameMode == .copyToFolder ? "doc.on.doc" : "pencil")
+                            .font(.system(size: 11, weight: .semibold))
                     }
-                    .padding(20)
                 }
-
-                Divider()
-
-                // Bottom bar
-                bottomBar
+                .buttonStyle(PrimaryToolbarButtonStyle())
+                .disabled(
+                    viewModel.previewItems.isEmpty ||
+                    viewModel.isRenaming ||
+                    viewModel.renameComplete ||
+                    (viewModel.renameMode == .copyToFolder && viewModel.destinationURL == nil)
+                )
             }
         }
-        .frame(minWidth: 680, minHeight: 500)
-        // Progress overlay
         .overlay(alignment: .center) {
             if viewModel.isScanning || viewModel.isRenaming {
-                progressOverlay
+                RenameProgressOverlay(viewModel: viewModel)
             }
         }
     }
+}
 
-    // MARK: - Folder Section
+// MARK: - Rename Source Panel
 
-    private var folderSection: some View {
-        VStack(spacing: 12) {
-            // Source folder
-            HStack(spacing: 12) {
-                FolderCard(
-                    label: "Source",
-                    icon: "folder",
-                    url: viewModel.sourceURL,
-                    color: .orange
-                ) {
-                    viewModel.selectSource()
-                }
+struct RenameSourcePanel: View {
+    @Bindable var viewModel: RenameViewModel
 
-                // Subfolders toggle
-                VStack(spacing: 4) {
-                    Toggle(isOn: $viewModel.includeSubfolders) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "folder.badge.questionmark")
-                                .font(.system(size: 10))
-                            Text("Subfolders")
-                                .font(.system(size: 11))
-                        }
-                    }
-                    .toggleStyle(.checkbox)
-                }
-                .frame(width: 110)
-            }
-
-            // Destination folder (only shown in copy mode)
-            if viewModel.renameMode == .copyToFolder {
-                FolderCard(
-                    label: "Destination",
-                    icon: "folder.badge.plus",
-                    url: viewModel.destinationURL,
-                    color: .green
-                ) {
-                    viewModel.selectDestination()
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("SOURCE")
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(0.5)
+                Spacer()
+                if !viewModel.discoveredFiles.isEmpty {
+                    Text("\(viewModel.discoveredFiles.count) files")
+                        .font(.system(size: 10, weight: .medium)).foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
                 }
             }
-        }
-    }
+            .padding(.horizontal, 12).padding(.vertical, 10)
 
-    // MARK: - Pattern Section
+            Divider()
 
-    private var patternSection: some View {
-        SettingCard {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    Label("Naming pattern", systemImage: "textformat.abc")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(.secondary)
-
-                    Picker("", selection: $viewModel.pattern) {
-                        ForEach(RenamePattern.allCases) { p in
-                            Text(p.displayName).tag(p)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: 200)
-
-                    Spacer()
-                }
-
-                // Live example
-                HStack(spacing: 6) {
-                    Image(systemName: "eye")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                    Text("Example: ")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                    Text(viewModel.pattern.description)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                }
-
-                if viewModel.includeOtherFiles {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.tertiary)
-                        Text("Other files: ")
+            // Folder picker
+            Button {
+                viewModel.selectSource()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "folder")
+                        .font(.system(size: 13)).foregroundStyle(.orange).frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Source Folder")
+                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
+                        Text(viewModel.sourceURL?.abbreviatingWithTildeInPath ?? "Click to select…")
                             .font(.system(size: 11))
-                            .foregroundStyle(.tertiary)
-                        Text("20260312_143522_document.pdf")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(viewModel.sourceURL != nil ? .primary : .secondary)
+                            .lineLimit(2).truncationMode(.middle)
                     }
-                }
-            }
-        }
-        .onChange(of: viewModel.pattern) {
-            if !viewModel.discoveredFiles.isEmpty {
-                viewModel.regeneratePreview()
-            }
-        }
-    }
-
-    // MARK: - Options Row
-
-    private var optionsRow: some View {
-        SettingCard {
-            VStack(spacing: 10) {
-                HStack(spacing: 14) {
-                    TypeToggle(label: "Photos", icon: "photo", color: .blue, isOn: $viewModel.includePhotos)
-                    TypeToggle(label: "Videos", icon: "video", color: .purple, isOn: $viewModel.includeVideos)
-                    TypeToggle(label: "Other files", icon: "doc", color: .gray, isOn: $viewModel.includeOtherFiles)
-
                     Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.tertiary)
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(NSColor.controlBackgroundColor))
+                        .overlay(RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(viewModel.sourceURL != nil ? Color.orange.opacity(0.3) : Color.clear, lineWidth: 1))
+                )
+            }
+            .buttonStyle(.plain).padding(10)
 
-                    // Rename mode picker
-                    HStack(spacing: 6) {
-                        Image(systemName: viewModel.renameMode == .copyToFolder ? "doc.on.doc" : "pencil")
-                            .font(.system(size: 10))
-                            .foregroundStyle(Color.accentColor)
-                        Picker("", selection: $viewModel.renameMode) {
-                            ForEach(RenameMode.allCases, id: \.self) { m in
-                                Text(m.rawValue).tag(m)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 160)
+            Divider()
+
+            // Footer (subfolders + scan) — always visible below folder picker
+            HStack(spacing: 8) {
+                Toggle(isOn: $viewModel.includeSubfolders) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.questionmark").font(.system(size: 10))
+                        Text("Subfolders").font(.system(size: 11))
                     }
                 }
+                .toggleStyle(.checkbox)
+                Spacer()
+                Button("Scan") { Task { await viewModel.scanAndPreview() } }
+                    .buttonStyle(SecondaryButtonStyle()).controlSize(.small)
+                    .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isRenaming)
             }
-        }
-    }
+            .padding(.horizontal, 12).padding(.vertical, 10)
 
-    // MARK: - Preview List
+            Divider()
 
-    private var previewListHeader: some View {
-        HStack {
-            Text("Preview (\(viewModel.previewItems.count) files)")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-            Spacer()
-        }
-    }
-
-    private var previewList: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            previewListHeader
-
-            // Table-like list
-            VStack(spacing: 0) {
-                // Header row
-                renameTableHeader
-
-                Divider()
-
-                // Items (show first 200)
+            // File list
+            if viewModel.discoveredFiles.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "folder.badge.questionmark")
+                        .font(.system(size: 28)).foregroundStyle(.tertiary)
+                    Text("Scan to see files")
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
                 ScrollView {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(viewModel.previewItems.prefix(200).enumerated()), id: \.element.id) { index, item in
-                            RenamePreviewRow(item: item, index: index)
+                        ForEach(Array(viewModel.discoveredFiles.prefix(500).enumerated()), id: \.element.id) { idx, file in
+                            SourceFileRow(file: file, index: idx)
                         }
                     }
                 }
-                .frame(maxHeight: 250)
+            }
+        }
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+}
 
-                if viewModel.previewItems.count > 200 {
-                    Text("Showing 200 of \(viewModel.previewItems.count) files…")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                        .padding(8)
+// MARK: - Rename Config Panel
+
+struct RenameConfigPanel: View {
+    @Bindable var viewModel: RenameViewModel
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                // Destination (only for copy mode)
+                if viewModel.renameMode == .copyToFolder {
+                    destinationSection
                 }
+                patternSection
+                optionsSection
+                completionBanner
             }
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(NSColor.controlBackgroundColor))
-            )
+            .padding(14)
         }
+        .background(Color(NSColor.windowBackgroundColor))
     }
 
-    private var renameTableHeader: some View {
-        HStack(spacing: 0) {
-            Text("Original")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Image(systemName: "arrow.right")
-                .font(.system(size: 9))
-                .foregroundStyle(.tertiary)
-                .frame(width: 30)
-            Text("New Name")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(.tertiary)
-                .textCase(.uppercase)
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(0.5)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    // MARK: - Complete Message
-
-    private var completeMessage: some View {
-        HStack(spacing: 10) {
-            Image(systemName: viewModel.errorCount > 0 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                .foregroundStyle(viewModel.errorCount > 0 ? .orange : .green)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.renameMode == .copyToFolder ? "Copy & rename complete" : "Rename complete")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("\(viewModel.renamedCount) files \(viewModel.renameMode == .copyToFolder ? "copied" : "renamed")" + (viewModel.errorCount > 0 ? ", \(viewModel.errorCount) errors" : ""))
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            Button("Reset") {
-                viewModel.reset()
-            }
-            .buttonStyle(SecondaryButtonStyle())
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color(NSColor.controlBackgroundColor))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .strokeBorder(viewModel.errorCount > 0 ? Color.orange.opacity(0.3) : Color.green.opacity(0.3), lineWidth: 1)
-                )
-        )
-    }
-
-    // MARK: - Bottom Bar
-
-    private var bottomBar: some View {
-        HStack(spacing: 12) {
-            Button("Scan & Preview") {
-                Task { await viewModel.scanAndPreview() }
-            }
-            .buttonStyle(SecondaryButtonStyle())
-            .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isRenaming)
-
-            if !viewModel.previewItems.isEmpty && !viewModel.renameComplete {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 6, height: 6)
-                    Text("\(viewModel.previewItems.count) files ready")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer()
-
-            Button {
-                Task { await viewModel.executeRename() }
-            } label: {
-                HStack(spacing: 6) {
-                    Text(viewModel.renameMode == .copyToFolder ? "Copy & Rename" : "Rename All")
-                    Image(systemName: viewModel.renameMode == .copyToFolder ? "doc.on.doc" : "pencil")
-                        .font(.system(size: 11, weight: .semibold))
-                }
-            }
-            .buttonStyle(PrimaryButtonStyle())
-            .disabled(
-                viewModel.previewItems.isEmpty ||
-                viewModel.isRenaming ||
-                viewModel.renameComplete ||
-                (viewModel.renameMode == .copyToFolder && viewModel.destinationURL == nil)
-            )
-        }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-    }
-
-    // MARK: - Progress Overlay
-
-    private var progressOverlay: some View {
-        ZStack {
-            Color(NSColor.windowBackgroundColor).opacity(0.85)
-                .ignoresSafeArea()
-                .background(.ultraThinMaterial)
-
-            VStack(spacing: 12) {
-                ProgressView(value: viewModel.progress)
-                    .progressViewStyle(.linear)
-                    .frame(width: 280)
-                    .tint(Color.accentColor)
-
+    private var destinationSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            sectionHeader("Destination")
+            Button { viewModel.selectDestination() } label: {
                 HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(viewModel.isScanning ? "Scanning files…" : "\(viewModel.renameMode == .copyToFolder ? "Copying" : "Renaming"): \(viewModel.currentFileName)")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                    Image(systemName: "folder.badge.plus")
+                        .font(.system(size: 13)).foregroundStyle(.green).frame(width: 20)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Destination Folder")
+                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
+                        Text(viewModel.destinationURL?.abbreviatingWithTildeInPath ?? "Click to select…")
+                            .font(.system(size: 11))
+                            .foregroundStyle(viewModel.destinationURL != nil ? .primary : .secondary)
+                            .lineLimit(2).truncationMode(.middle)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.tertiary)
                 }
-
-                if viewModel.isRenaming {
-                    Text("\(viewModel.currentFileIndex) / \(viewModel.totalFiles)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.tertiary)
-                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(NSColor.controlBackgroundColor))
+                        .overlay(RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(viewModel.destinationURL != nil ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1))
+                )
             }
-            .padding(32)
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var patternSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            sectionHeader("Naming Pattern")
+            VStack(spacing: 0) {
+                HStack {
+                    Label("Pattern", systemImage: "textformat.abc")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("", selection: $viewModel.pattern) {
+                        ForEach(RenamePattern.allCases) { p in Text(p.displayName).tag(p) }
+                    }
+                    .labelsHidden().frame(maxWidth: 180)
+                    .onChange(of: viewModel.pattern) {
+                        if !viewModel.discoveredFiles.isEmpty { viewModel.regeneratePreview() }
+                    }
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                Divider().padding(.horizontal, 10)
+                HStack(spacing: 4) {
+                    Image(systemName: "eye").font(.system(size: 10)).foregroundStyle(.tertiary)
+                    Text("Example: ").font(.system(size: 11)).foregroundStyle(.tertiary)
+                    Text(viewModel.pattern.description)
+                        .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+            }
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
+        }
+    }
+
+    private var optionsSection: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            sectionHeader("Options")
+            VStack(spacing: 0) {
+                HStack {
+                    Label("Mode", systemImage: "pencil")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("", selection: $viewModel.renameMode) {
+                        ForEach(RenameMode.allCases, id: \.self) { m in Text(m.rawValue).tag(m) }
+                    }
+                    .labelsHidden().frame(maxWidth: 180)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                Divider().padding(.horizontal, 10)
+                HStack(spacing: 12) {
+                    TypeToggle(label: "Photos", icon: "photo", color: .blue, isOn: $viewModel.includePhotos)
+                    TypeToggle(label: "Videos", icon: "video", color: .purple, isOn: $viewModel.includeVideos)
+                    TypeToggle(label: "Other", icon: "doc", color: .gray, isOn: $viewModel.includeOtherFiles)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+                Divider().padding(.horizontal, 10)
+                HStack {
+                    Label("Fallback date", systemImage: "calendar.badge.exclamationmark")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                    Spacer()
+                    Picker("", selection: $viewModel.dateFallback) {
+                        ForEach(DateFallback.allCases, id: \.self) { f in Text(f.rawValue).tag(f) }
+                    }
+                    .labelsHidden().frame(maxWidth: 180)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
+            }
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
+        }
+    }
+
+    @ViewBuilder
+    private var completionBanner: some View {
+        if viewModel.renameComplete {
+            HStack(spacing: 10) {
+                Image(systemName: viewModel.errorCount > 0 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                    .foregroundStyle(viewModel.errorCount > 0 ? .orange : .green)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(viewModel.renameMode == .copyToFolder ? "Copy & rename complete" : "Rename complete")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("\(viewModel.renamedCount) files" + (viewModel.errorCount > 0 ? ", \(viewModel.errorCount) errors" : ""))
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Button("Reset") { viewModel.reset() }.buttonStyle(SecondaryButtonStyle())
+            }
+            .padding(12)
             .background(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(Color(NSColor.controlBackgroundColor))
-                    .shadow(color: .black.opacity(0.15), radius: 20, y: 8)
+                    .overlay(RoundedRectangle(cornerRadius: 10)
+                        .strokeBorder(viewModel.errorCount > 0 ? Color.orange.opacity(0.3) : Color.green.opacity(0.3), lineWidth: 1))
             )
         }
     }
 }
 
-// MARK: - Preview Row (extracted for type-checker)
+// MARK: - Rename Preview Panel
 
-private struct RenamePreviewRow: View {
+struct RenamePreviewPanel: View {
+    var viewModel: RenameViewModel
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("PREVIEW")
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(0.5)
+                Spacer()
+                if !viewModel.previewItems.isEmpty {
+                    Text("\(viewModel.previewItems.count) files")
+                        .font(.system(size: 10)).foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+
+            Divider()
+
+            if viewModel.previewItems.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 34)).foregroundStyle(.tertiary)
+                    Text("Scan to see preview")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                // Table header
+                HStack(spacing: 0) {
+                    Text("ORIGINAL").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "arrow.right").font(.system(size: 9)).foregroundStyle(.tertiary).frame(width: 28)
+                    Text("NEW NAME").font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 6)
+
+                Divider()
+
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(viewModel.previewItems.prefix(300).enumerated()), id: \.element.id) { idx, item in
+                            RenamePreviewRow2(item: item, index: idx)
+                        }
+                    }
+                }
+
+                if viewModel.previewItems.count > 300 {
+                    Text("Showing 300 of \(viewModel.previewItems.count) files…")
+                        .font(.system(size: 10)).foregroundStyle(.tertiary).padding(8)
+                }
+            }
+        }
+        .background(Color(NSColor.windowBackgroundColor))
+    }
+}
+
+private struct RenamePreviewRow2: View {
     let item: RenameViewModel.RenamePreview
     let index: Int
 
@@ -381,31 +367,50 @@ private struct RenamePreviewRow: View {
             Image(systemName: isOther ? "doc" : (isVideo ? "video" : "photo"))
                 .font(.system(size: 9))
                 .foregroundStyle(isOther ? Color.gray : (isVideo ? Color.purple : Color.blue))
-                .frame(width: 18)
-
+                .frame(width: 16)
             Text(item.originalName)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
             Image(systemName: unchanged ? "equal" : "arrow.right")
                 .font(.system(size: 9))
                 .foregroundStyle(unchanged ? Color.secondary : Color.accentColor)
-                .frame(width: 30)
-
+                .frame(width: 28)
             Text(item.newName)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(unchanged ? .secondary : .primary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 5)
-        .background(
-            index % 2 == 0
-                ? Color.clear
-                : Color(NSColor.controlBackgroundColor).opacity(0.4)
-        )
+        .padding(.horizontal, 12).padding(.vertical, 4)
+        .background(index % 2 == 0 ? Color.clear : Color(NSColor.controlBackgroundColor).opacity(0.4))
+    }
+}
+
+// MARK: - Rename Progress Overlay
+
+struct RenameProgressOverlay: View {
+    var viewModel: RenameViewModel
+
+    var body: some View {
+        ZStack {
+            Color(NSColor.windowBackgroundColor).opacity(0.85).ignoresSafeArea()
+                .background(.ultraThinMaterial)
+            VStack(spacing: 12) {
+                ProgressView(value: viewModel.progress)
+                    .progressViewStyle(.linear).frame(width: 280).tint(Color.accentColor)
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(viewModel.isScanning ? "Scanning files…" : "\(viewModel.renameMode == .copyToFolder ? "Copying" : "Renaming"): \(viewModel.currentFileName)")
+                        .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
+                }
+                if viewModel.isRenaming {
+                    Text("\(viewModel.currentFileIndex) / \(viewModel.totalFiles)")
+                        .font(.system(size: 11)).foregroundStyle(.tertiary)
+                }
+            }
+            .padding(32)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color(NSColor.controlBackgroundColor))
+                .shadow(color: .black.opacity(0.15), radius: 20, y: 8))
+        }
     }
 }

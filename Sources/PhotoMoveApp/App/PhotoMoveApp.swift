@@ -1,82 +1,66 @@
 import SwiftUI
 
-enum AppTab: String, CaseIterable {
-    case mover = "Mover"
-    case rename = "Rename"
+enum SidebarItem: String, CaseIterable, Hashable {
+    case mover    = "Mover"
+    case rename   = "Rename"
+    case activity = "Activity"
+    case settings = "Settings"
+
+    var icon: String {
+        switch self {
+        case .mover:    return "folder.badge.gearshape"
+        case .rename:   return "textformat.abc"
+        case .activity: return "list.clipboard"
+        case .settings: return "gear"
+        }
+    }
 }
 
 @main
 struct MediaMoverApplication: App {
     var body: some Scene {
         WindowGroup {
-            AppShell()
+            ContentView()
         }
-        .defaultSize(width: 720, height: 560)
+        .defaultSize(width: 1120, height: 720)
     }
 }
 
-struct AppShell: View {
-    @State private var selectedTab: AppTab = .mover
+struct ContentView: View {
+    @State private var selection: SidebarItem? = .mover
+    @State private var organizerVM = OrganizerViewModel()
+    @State private var renameVM    = RenameViewModel()
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Tab bar
-            HStack(spacing: 0) {
-                ForEach(AppTab.allCases, id: \.self) { tab in
-                    TabButton(
-                        title: tab.rawValue,
-                        icon: tab == .mover ? "tray.and.arrow.up" : "pencil.and.list.clipboard",
-                        isSelected: selectedTab == tab
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.15)) {
-                            selectedTab = tab
-                        }
-                    }
-                }
-                Spacer()
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
-            .padding(.bottom, 4)
-            .background(Color(NSColor.windowBackgroundColor))
-
-            Divider()
-
-            // Content
-            Group {
-                switch selectedTab {
-                case .mover:
-                    MainView()
-                case .rename:
-                    RenameView()
-                }
+        NavigationSplitView {
+            SidebarView(selection: $selection)
+                .navigationSplitViewColumnWidth(min: 150, ideal: 190, max: 230)
+        } detail: {
+            ZStack(alignment: .bottom) {
+                detailContent
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                StatusBarView(
+                    organizerVM: organizerVM,
+                    renameVM: renameVM,
+                    selection: selection ?? .mover
+                )
             }
         }
+        .navigationSplitViewStyle(.balanced)
+        .frame(minWidth: 900, minHeight: 600)
     }
-}
 
-struct TabButton: View {
-    let title: String
-    let icon: String
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 11, weight: .medium))
-                Text(title)
-                    .font(.system(size: 12, weight: isSelected ? .semibold : .medium))
-            }
-            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.1) : Color.clear)
-            )
+    @ViewBuilder
+    private var detailContent: some View {
+        switch selection ?? .mover {
+        case .mover:
+            MoverView(viewModel: organizerVM)
+        case .rename:
+            RenameView(viewModel: renameVM)
+        case .activity:
+            ActivityView(organizerVM: organizerVM)
+        case .settings:
+            SettingsView(viewModel: organizerVM)
         }
-        .buttonStyle(.plain)
     }
 }

@@ -6,6 +6,10 @@ A native macOS app to organize and rename photos, videos, and other files based 
 
 **[Download latest DMG](https://github.com/tiagotrindade/MediaMover/releases/latest)** — macOS 14+ (Apple Silicon & Intel)
 
+## Screenshot
+
+![MediaMover](docs/screenshot.png)
+
 ## Features
 
 ### Media Organization (Mover)
@@ -99,31 +103,38 @@ make dmg
 
 ## Usage
 
+The app uses a sidebar with four sections: **Mover**, **Rename**, **Activity**, and **Settings**.
+
 ### Mover (Organize files into folders)
-1. Select a **source folder** containing photos/videos/files
-2. Select a **destination folder**
-3. Choose a folder pattern (e.g., YYYY/MM/DD)
+The Mover view has three panels: source file list, configuration, and a live folder tree preview.
+
+1. Select a **source folder** in the left panel — click **Scan** to enumerate files
+2. Select a **destination folder** in the configuration panel
+3. Choose a **folder pattern** (e.g., YYYY/MM/DD, YYYY_MM_DD, etc.)
 4. Configure options:
    - **Mode**: Copy or Move
+   - **Camera / Videos subfolder**: create subfolders by camera model or media type
+   - **Rename with date**: prepend timestamp to filenames
    - **File types**: Photos, Videos, Other Files
-   - **Subfolders**: Include subfolders toggle
    - **Duplicates**: Ask, Automatic, or Skip
+   - **Integrity**: XXHash64 or SHA-256 post-transfer verification
    - **Date fallback**: Creation date, Modification date, or Skip
-   - **Subfolders**: Videos subfolder, Camera subfolder
-   - **Rename**: Prepend date/time to filenames
-   - **Integrity**: XXHash64 or SHA-256 verification
-5. Click **Scan** to preview how files will be organized
-6. Click **Organize** to start
+5. The **Preview panel** updates automatically as you change settings
+6. Click **Start** (top right) to organize
 
-Use the **undo button** (↩) to reverse the last operation, or the **log button** (📋) to review activity history.
+Use the **↩ Undo** button in the toolbar to reverse the last operation.
 
-### Mass Rename (Batch rename files)
-1. Select a **source folder**
-2. Choose a **naming pattern** (e.g., Date prefix, Sequential)
-3. Optionally enable **Include Subfolders** and **Other Files**
-4. Choose **Rename in Place** or **Copy to Folder**
-5. Preview the before/after filenames
-6. Click **Rename** to apply
+### Rename (Batch rename files)
+The Rename view has three panels: source file list, pattern configuration, and a before→after preview.
+
+1. Select a **source folder** — click **Scan**
+2. Choose a **naming pattern** (Date prefix, Date-Time, Sequential, Camera model, etc.)
+3. Choose **Rename in Place** or **Copy to Folder**
+4. Preview the before/after filenames in the right panel
+5. Click **Rename All** (or **Copy & Rename**) to apply
+
+### Activity
+Full operation history with timestamps, status indicators, search, and export.
 
 ## License
 

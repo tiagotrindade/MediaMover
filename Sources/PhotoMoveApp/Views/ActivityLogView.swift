@@ -1,86 +1,96 @@
 import SwiftUI
 
-struct ActivityLogView: View {
-    @Bindable var viewModel: OrganizerViewModel
+struct ActivityView: View {
+    var organizerVM: OrganizerViewModel
+
     @State private var filterText: String = ""
     @State private var filterStatus: LogStatus? = nil
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Activity Log")
-                    .font(.headline)
-
-                Spacer()
-
-                // Filter by status
-                Picker("Filter", selection: $filterStatus) {
-                    Text("All").tag(nil as LogStatus?)
-                    Text("Success").tag(LogStatus.success as LogStatus?)
-                    Text("Warnings").tag(LogStatus.warning as LogStatus?)
-                    Text("Errors").tag(LogStatus.error as LogStatus?)
-                    Text("Info").tag(LogStatus.info as LogStatus?)
-                }
-                .frame(width: 120)
-
-                Button("Clear Log") {
-                    Task { await viewModel.clearLog() }
-                }
-
-                Button {
-                    Task {
-                        if let url = await viewModel.exportLogFile() {
-                            NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
-                        }
-                    }
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .help("Show log file in Finder")
-            }
-            .padding()
-
-            // Search bar
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("Search...", text: $filterText)
-                    .textFieldStyle(.roundedBorder)
-
-                Text("\(filteredEntries.count) entries")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
-
+            toolbarArea
             Divider()
-
-            // Log entries
             if filteredEntries.isEmpty {
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.text")
-                        .font(.largeTitle)
-                        .foregroundStyle(.secondary)
-                    Text("No log entries")
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                emptyState
             } else {
-                List(filteredEntries.reversed()) { entry in
-                    logEntryRow(entry)
-                }
+                entryList
             }
         }
-        .frame(minWidth: 600, minHeight: 400)
-        .task {
-            await viewModel.loadLog()
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(NSColor.windowBackgroundColor))
+        .task { await organizerVM.loadLog() }
     }
 
+    // MARK: - Toolbar
+
+    private var toolbarArea: some View {
+        HStack(spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.system(size: 12))
+                TextField("Search activity…", text: $filterText)
+                    .textFieldStyle(.plain).font(.system(size: 12))
+            }
+            .padding(.horizontal, 8).padding(.vertical, 5)
+            .background(RoundedRectangle(cornerRadius: 7).fill(Color(NSColor.controlBackgroundColor)))
+            .frame(maxWidth: 220)
+
+            Picker("", selection: $filterStatus) {
+                Text("All").tag(nil as LogStatus?)
+                Text("Success").tag(LogStatus.success as LogStatus?)
+                Text("Warnings").tag(LogStatus.warning as LogStatus?)
+                Text("Errors").tag(LogStatus.error as LogStatus?)
+            }
+            .labelsHidden().frame(width: 100)
+
+            Spacer()
+
+            Text("\(filteredEntries.count) entries")
+                .font(.caption).foregroundStyle(.secondary)
+
+            Button("Clear") { Task { await organizerVM.clearLog() } }
+                .buttonStyle(SecondaryButtonStyle()).controlSize(.small)
+
+            Button {
+                Task {
+                    if let url = await organizerVM.exportLogFile() {
+                        NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
+                    }
+                }
+            } label: {
+                Image(systemName: "square.and.arrow.up")
+            }
+            .buttonStyle(SecondaryButtonStyle()).controlSize(.small).help("Show log file in Finder")
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+    }
+
+    // MARK: - Empty state
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "clock.badge.questionmark")
+                .font(.system(size: 40)).foregroundStyle(.tertiary)
+            Text("No activity yet")
+                .font(.system(size: 15, weight: .semibold)).foregroundStyle(.secondary)
+            Text("Organize or rename files to see history here.")
+                .font(.system(size: 12)).foregroundStyle(.tertiary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Entry list
+
+    private var entryList: some View {
+        List(filteredEntries.reversed()) { entry in
+            ActivityEntryRow(entry: entry)
+        }
+        .listStyle(.inset)
+    }
+
+    // MARK: - Filter
+
     private var filteredEntries: [LogEntry] {
-        viewModel.logEntries.filter { entry in
+        organizerVM.logEntries.filter { entry in
             let matchesStatus = filterStatus == nil || entry.status == filterStatus
             let matchesText = filterText.isEmpty
                 || entry.sourcePath.localizedCaseInsensitiveContains(filterText)
@@ -90,85 +100,88 @@ struct ActivityLogView: View {
             return matchesStatus && matchesText
         }
     }
+}
 
-    private func logEntryRow(_ entry: LogEntry) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            statusIcon(entry.status)
-                .frame(width: 16)
+// MARK: - Activity Entry Row
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    Text(entry.action.uppercased())
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(actionColor(entry.action).opacity(0.15))
-                        .foregroundStyle(actionColor(entry.action))
-                        .cornerRadius(3)
+struct ActivityEntryRow: View {
+    let entry: LogEntry
+    @State private var isExpanded = false
 
-                    Spacer()
-
-                    Text(formattedDate(entry.timestamp))
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                statusIcon.frame(width: 14)
+                actionBadge
+                Text(URL(fileURLWithPath: entry.sourcePath).lastPathComponent)
+                    .font(.system(size: 12)).lineLimit(1).truncationMode(.middle)
+                Spacer()
+                Text(formattedDate)
+                    .font(.caption2).foregroundStyle(.tertiary)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
+                } label: {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9)).foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
+            }
 
-                Text(entry.sourcePath)
-                    .font(.caption)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                if !entry.destinationPath.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.right")
-                            .font(.caption2)
-                        Text(entry.destinationPath)
-                            .font(.caption)
-                            .lineLimit(1)
-                            .truncationMode(.middle)
+            if isExpanded {
+                VStack(alignment: .leading, spacing: 3) {
+                    pathRow("From:", entry.sourcePath)
+                    if !entry.destinationPath.isEmpty { pathRow("To:", entry.destinationPath) }
+                    if let details = entry.details {
+                        Text(details).font(.caption2).foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(.secondary)
                 }
-
-                if let details = entry.details {
-                    Text(details)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+                .padding(.leading, 22)
+                .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .padding(.vertical, 2)
     }
 
-    private func statusIcon(_ status: LogStatus) -> some View {
-        switch status {
-        case .success:
-            return Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-        case .warning:
-            return Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-        case .error:
-            return Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
-        case .info:
-            return Image(systemName: "info.circle.fill").foregroundStyle(.blue)
+    private func pathRow(_ label: String, _ path: String) -> some View {
+        HStack(alignment: .top, spacing: 4) {
+            Text(label).font(.caption2).foregroundStyle(.tertiary).frame(width: 28, alignment: .leading)
+            Text(path).font(.system(size: 10, design: .monospaced)).foregroundStyle(.secondary).lineLimit(2)
         }
+    }
+
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch entry.status {
+        case .success: Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.green).font(.system(size: 12))
+        case .warning: Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Color.orange).font(.system(size: 12))
+        case .error:   Image(systemName: "xmark.circle.fill").foregroundStyle(Color.red).font(.system(size: 12))
+        case .info:    Image(systemName: "info.circle.fill").foregroundStyle(Color.blue).font(.system(size: 12))
+        }
+    }
+
+    private var actionBadge: some View {
+        let color = actionColor(entry.action)
+        return Text(entry.action.uppercased())
+            .font(.system(size: 9, weight: .bold, design: .monospaced)).foregroundStyle(color)
+            .padding(.horizontal, 5).padding(.vertical, 2)
+            .background(RoundedRectangle(cornerRadius: 3).fill(color.opacity(0.12)))
+    }
+
+    private var formattedDate: String {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HH:mm"
+        return f.string(from: entry.timestamp)
     }
 
     private func actionColor(_ action: String) -> Color {
         switch action {
-        case "copy": return .blue
-        case "move": return .purple
-        case "skip": return .orange
-        case "verify": return .green
+        case "copy":            return .blue
+        case "move":            return .purple
+        case "skip":            return .orange
+        case "verify":          return .green
         case "undo-delete", "undo-move": return .cyan
-        case "error", "undo-error": return .red
-        default: return .gray
+        case "error", "undo-error":      return .red
+        case "rename", "rename-copy":    return .indigo
+        default:                return .gray
         }
-    }
-
-    private func formattedDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return f.string(from: date)
     }
 }
