@@ -1,5 +1,5 @@
-APP_NAME    = MediaMover
-BUNDLE_NAME = MediaMover
+APP_NAME    = FolioSort
+BUNDLE_NAME = FolioSort
 APP_BUNDLE  = $(BUNDLE_NAME).app
 DMG_NAME    = $(BUNDLE_NAME).dmg
 BUILD_DIR   = .build/release

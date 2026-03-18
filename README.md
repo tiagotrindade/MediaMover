@@ -1,14 +1,14 @@
-# MediaMover
+# FolioSort
 
 A native macOS app to organize and rename photos, videos, and other files based on EXIF metadata or file dates. Inspired by PhotoMove2, with full video, RAW format, non-media file support, and a built-in Mass Rename tool.
 
 ## Download
 
-**[Download latest DMG](https://github.com/tiagotrindade/MediaMover/releases/latest)** — macOS 14+ (Apple Silicon & Intel)
+**[Download latest DMG](https://github.com/tiagotrindade/FolioSort/releases/latest)** — macOS 14+ (Apple Silicon & Intel)
 
 ## Screenshot
 
-![MediaMover](docs/screenshot.png)
+![FolioSort](docs/screenshot.png)
 
 ## Features
 

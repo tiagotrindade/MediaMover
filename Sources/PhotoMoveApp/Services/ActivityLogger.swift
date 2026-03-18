@@ -41,7 +41,7 @@ actor ActivityLogger {
 
     private init() {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let appDir = support.appendingPathComponent("MediaMover")
+        let appDir = support.appendingPathComponent("FolioSort")
         try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
         logFileURL = appDir.appendingPathComponent("activity.log")
     }

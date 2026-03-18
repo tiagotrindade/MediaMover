@@ -17,7 +17,7 @@ enum SidebarItem: String, CaseIterable, Hashable {
 }
 
 @main
-struct MediaMoverApplication: App {
+struct FolioSortApplication: App {
     var body: some Scene {
         WindowGroup {
             ContentView()

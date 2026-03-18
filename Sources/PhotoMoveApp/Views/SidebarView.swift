@@ -9,6 +9,6 @@ struct SidebarView: View {
                 .tag(item)
         }
         .listStyle(.sidebar)
-        .navigationTitle("MediaMover")
+        .navigationTitle("FolioSort")
     }
 }
