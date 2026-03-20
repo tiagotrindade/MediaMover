@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var selection: SidebarItem? = .mover
     @State private var organizerVM = OrganizerViewModel()
     @State private var renameVM    = RenameViewModel()
+    @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
 
     var body: some View {
         NavigationSplitView {
@@ -48,6 +49,9 @@ struct ContentView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 900, minHeight: 600)
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView(isPresented: $showOnboarding, viewModel: organizerVM)
+        }
     }
 
     @ViewBuilder

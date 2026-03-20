@@ -18,6 +18,7 @@ struct ConfigPanel: View {
             ScrollView {
                 VStack(spacing: 18) {
                     destinationCard
+                    profileSection
                     folderStructureSection
                     fileHandlingSection
                     safetySection
@@ -28,7 +29,7 @@ struct ConfigPanel: View {
         }
         .background(Color(NSColor.windowBackgroundColor))
         .onChange(of: viewModel.renameWithDate)    { viewModel.generatePreview() }
-        .onChange(of: viewModel.pattern)           { viewModel.generatePreview() }
+        .onChange(of: viewModel.folderTemplate)    { viewModel.generatePreview() }
         .onChange(of: viewModel.separateByCamera)  { viewModel.generatePreview() }
         .onChange(of: viewModel.separateVideos)    { viewModel.generatePreview() }
         .onChange(of: viewModel.dateFallback)      { viewModel.generatePreview() }
@@ -60,7 +61,7 @@ struct ConfigPanel: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Destination Folder")
                             .font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
-                        Text(viewModel.destinationURL?.abbreviatingWithTildeInPath ?? "Click to select…")
+                        Text(viewModel.destinationURL?.abbreviatingWithTildeInPath ?? "Click to select\u{2026}")
                             .font(.system(size: 11))
                             .foregroundStyle(viewModel.destinationURL != nil ? .primary : .secondary)
                             .lineLimit(2).truncationMode(.middle)
@@ -95,25 +96,25 @@ struct ConfigPanel: View {
             }
     }
 
-    // MARK: - Folder Structure
+    // MARK: - Profiles / Presets
+
+    private var profileSection: some View {
+        ProfilePickerView(viewModel: viewModel)
+    }
+
+    // MARK: - Folder Structure (Template Builder)
 
     private var folderStructureSection: some View {
         VStack(alignment: .leading, spacing: 7) {
             sectionHeader("Folder Structure")
+
+            TemplateBuilderView(
+                template: $viewModel.folderTemplate,
+                validation: viewModel.templateValidation,
+                previewFiles: Array(viewModel.discoveredFiles.prefix(3))
+            )
+
             VStack(spacing: 0) {
-                configRow(label: "Pattern", icon: "folder.fill.badge.gearshape") {
-                    Picker("", selection: $viewModel.pattern) {
-                        ForEach(OrganizationPattern.allCases) { p in
-                            Text(p.displayName).tag(p)
-                        }
-                    }
-                    .labelsHidden().frame(maxWidth: 180)
-                }
-                thinDivider
-                configRow(label: "Camera subfolder", icon: "camera.fill") {
-                    Toggle("", isOn: $viewModel.separateByCamera).labelsHidden().toggleStyle(.checkbox)
-                }
-                thinDivider
                 configRow(label: "Videos subfolder", icon: "video.fill") {
                     Toggle("", isOn: $viewModel.separateVideos).labelsHidden().toggleStyle(.checkbox)
                 }

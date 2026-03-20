@@ -38,8 +38,11 @@ struct RenameView: View {
                     viewModel.previewItems.isEmpty ||
                     viewModel.isRenaming ||
                     viewModel.renameComplete ||
-                    (viewModel.renameMode == .copyToFolder && viewModel.destinationURL == nil)
+                    (viewModel.renameMode == .copyToFolder && viewModel.destinationURL == nil) ||
+                    (viewModel.useRegexMode && (viewModel.regexMatchCount == 0 || viewModel.regexError != nil))
                 )
+                .help(viewModel.useRegexMode && viewModel.regexMatchCount == 0 && viewModel.regexError == nil
+                      ? "Regex doesn't match any files" : "")
             }
         }
         .overlay(alignment: .center) {
@@ -177,13 +180,34 @@ struct RenameConfigPanel: View {
                 if viewModel.renameMode == .copyToFolder {
                     destinationSection
                 }
-                patternSection
+                renameModeToggle
+                if viewModel.useRegexMode {
+                    RegexRenameSection(viewModel: viewModel)
+                } else {
+                    patternSection
+                }
                 optionsSection
                 completionBanner
             }
             .padding(14)
         }
         .background(Color(NSColor.windowBackgroundColor))
+    }
+
+    // MARK: - Rename Mode Toggle (Pattern vs Regex)
+
+    private var renameModeToggle: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            sectionHeader("Rename Mode")
+            Picker("", selection: $viewModel.useRegexMode) {
+                Text("Pattern").tag(false)
+                Text("Regex").tag(true)
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: viewModel.useRegexMode) {
+                if !viewModel.discoveredFiles.isEmpty { viewModel.regeneratePreview() }
+            }
+        }
     }
 
     private func sectionHeader(_ title: String) -> some View {
@@ -375,7 +399,15 @@ struct RenamePreviewPanel: View {
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(viewModel.previewItems.prefix(300).enumerated()), id: \.element.id) { idx, item in
-                            RenamePreviewRow2(item: item, index: idx)
+                            if viewModel.useRegexMode {
+                                RegexPreviewRow(
+                                    item: item,
+                                    index: idx,
+                                    matchRanges: viewModel.regexMatchRanges(in: item.originalName)
+                                )
+                            } else {
+                                RenamePreviewRow2(item: item, index: idx)
+                            }
                         }
                     }
                 }

@@ -146,7 +146,6 @@ final class ProfileManager {
     ]
 
     private func ensureBuiltInPresets() {
-        let builtInIds = Set(Self.builtInPresets.map(\.id))
         let existingIds = Set(profiles.map(\.id))
 
         for preset in Self.builtInPresets {

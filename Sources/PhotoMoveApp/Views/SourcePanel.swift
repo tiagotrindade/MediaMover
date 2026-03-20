@@ -162,9 +162,20 @@ struct SourceFileRow: View {
             thumbnailView
                 .frame(width: 30, height: 30)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
-            Text(file.fileName)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.primary).lineLimit(1)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(file.fileName)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.primary).lineLimit(1)
+                if let city = file.locationCity {
+                    HStack(spacing: 2) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 7)).foregroundStyle(.orange)
+                        Text(city + (file.locationCountry.map { ", \($0)" } ?? ""))
+                            .font(.system(size: 9)).foregroundStyle(.tertiary)
+                            .lineLimit(1)
+                    }
+                }
+            }
             Spacer()
             Text(ByteCountFormatter.string(fromByteCount: file.fileSize, countStyle: .file))
                 .font(.system(size: 10)).foregroundStyle(.tertiary)
