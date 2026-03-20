@@ -172,7 +172,7 @@ struct SourceFileRow: View {
         .padding(.horizontal, 10).padding(.vertical, 3)
         .background(index % 2 == 0 ? Color.clear : Color(NSColor.controlBackgroundColor).opacity(0.4))
         .task(id: file.id) {
-            thumbnail = await ThumbnailService.shared.thumbnail(for: file.url, mediaType: file.mediaType)
+            thumbnail = await ThumbnailService.shared.thumbnail(for: file.url)
         }
     }
 
