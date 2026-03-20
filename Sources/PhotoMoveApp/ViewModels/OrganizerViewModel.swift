@@ -50,6 +50,12 @@ final class OrganizerViewModel {
     var result: OperationResult?
     var scanMessage: String = ""
 
+    // Progress ETA
+    var filesPerSecond: Double = 0
+    var estimatedTimeRemaining: TimeInterval = 0
+    private var operationStartTime: Date?
+    private var currentTask: Task<Void, Never>?
+
     struct MoverPreview: Identifiable {
         let id = UUID()
         let fileName: String
@@ -94,12 +100,17 @@ final class OrganizerViewModel {
 
     // MARK: - Scan
 
+    func startScan() {
+        currentTask = Task { await scanFiles() }
+    }
+
     func scanFiles() async {
         guard let source = sourceURL else { return }
         isScanning = true
         discoveredFiles = []
         result = nil
         scanMessage = "Scanning files..."
+        operationStartTime = Date()
 
         let urls = FileEnumerator.enumerateMedia(
             in: source,
@@ -110,12 +121,15 @@ final class OrganizerViewModel {
         )
 
         totalFiles = urls.count
+        currentFileIndex = 0
+        progress = 0
         scanMessage = "Reading metadata for \(urls.count) files..."
 
         var files: [MediaFile] = []
         let batchSize = 8
 
         for batchStart in stride(from: 0, to: urls.count, by: batchSize) {
+            if Task.isCancelled { break }
             let batchEnd = min(batchStart + batchSize, urls.count)
             let batch = Array(urls[batchStart..<batchEnd])
 
@@ -134,15 +148,21 @@ final class OrganizerViewModel {
                 return results
             }
             files.append(contentsOf: batchResults)
+            currentFileIndex = files.count
+            progress = urls.count > 0 ? Double(files.count) / Double(urls.count) : 0
+            updateETA(processed: files.count, total: urls.count)
             scanMessage = "Read metadata: \(files.count) / \(urls.count)"
         }
 
-        discoveredFiles = files.sorted {
-            ($0.effectiveDate() ?? .distantPast) > ($1.effectiveDate() ?? .distantPast)
+        if !Task.isCancelled {
+            discoveredFiles = files.sorted {
+                ($0.effectiveDate() ?? .distantPast) > ($1.effectiveDate() ?? .distantPast)
+            }
+            generatePreview()
         }
-        generatePreview()
         isScanning = false
         scanMessage = ""
+        operationStartTime = nil
     }
 
     // MARK: - Preview Generation
@@ -194,6 +214,10 @@ final class OrganizerViewModel {
 
     // MARK: - Organize
 
+    func beginOrganizing() {
+        currentTask = Task { await startOrganizing() }
+    }
+
     func startOrganizing() async {
         guard !discoveredFiles.isEmpty, let destination = destinationURL else { return }
         isProcessing = true
@@ -202,6 +226,9 @@ final class OrganizerViewModel {
         result = nil
         rememberedDuplicateAction = nil
         applyDuplicateToAll = false
+        operationStartTime = Date()
+        filesPerSecond = 0
+        estimatedTimeRemaining = 0
 
         let organizer = FileOrganizer()
         let files = discoveredFiles
@@ -248,6 +275,7 @@ final class OrganizerViewModel {
                     self?.totalFiles = total
                     self?.currentFileName = fileName
                     self?.progress = total > 0 ? Double(current) / Double(total) : 0
+                    self?.updateETA(processed: current, total: total)
                 }
             }
         )
@@ -260,6 +288,9 @@ final class OrganizerViewModel {
 
         result = opResult
         isProcessing = false
+        operationStartTime = nil
+        filesPerSecond = 0
+        estimatedTimeRemaining = 0
         await refreshUndoState()
     }
 
@@ -331,6 +362,23 @@ final class OrganizerViewModel {
         showDuplicateDialog = false
         duplicateContinuation?.resume(returning: action)
         duplicateContinuation = nil
+    }
+
+    // MARK: - Cancel
+
+    func cancelOperation() {
+        currentTask?.cancel()
+        currentTask = nil
+    }
+
+    // MARK: - ETA
+
+    private func updateETA(processed: Int, total: Int) {
+        guard let start = operationStartTime, processed > 0 else { return }
+        let elapsed = Date().timeIntervalSince(start)
+        filesPerSecond = Double(processed) / elapsed
+        let remaining = total - processed
+        estimatedTimeRemaining = remaining > 0 ? Double(remaining) / filesPerSecond : 0
     }
 
     // MARK: - Reset

@@ -33,7 +33,7 @@ struct MoverView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await viewModel.startOrganizing() }
+                    viewModel.beginOrganizing()
                 } label: {
                     HStack(spacing: 5) {
                         Text("Start")
@@ -90,6 +90,7 @@ struct ProgressOverlayView: View {
                             .progressViewStyle(.linear)
                             .frame(width: 320)
                             .tint(Color.accentColor)
+
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
                             Text(viewModel.isScanning ? viewModel.scanMessage : viewModel.currentFileName)
@@ -98,11 +99,31 @@ struct ProgressOverlayView: View {
                                 .lineLimit(1)
                                 .frame(width: 300, alignment: .leading)
                         }
-                        if !viewModel.isScanning {
-                            Text("\(viewModel.currentFileIndex) / \(viewModel.totalFiles) files")
-                                .font(.system(size: 11))
-                                .foregroundStyle(.tertiary)
+
+                        HStack(spacing: 12) {
+                            Text("\(viewModel.currentFileIndex) / \(viewModel.totalFiles)")
+                                .font(.system(size: 11, design: .monospaced))
+                            Text("·").foregroundStyle(.quaternary)
+                            Text("\(Int(viewModel.progress * 100))%")
+                                .font(.system(size: 11, weight: .medium))
+                            if viewModel.filesPerSecond > 0 {
+                                Text("·").foregroundStyle(.quaternary)
+                                Text(String(format: "%.1f files/s", viewModel.filesPerSecond))
+                                    .font(.system(size: 11))
+                                if viewModel.estimatedTimeRemaining > 1 {
+                                    Text("·").foregroundStyle(.quaternary)
+                                    Text("ETA \(formatETA(viewModel.estimatedTimeRemaining))")
+                                        .font(.system(size: 11))
+                                }
+                            }
                         }
+                        .foregroundStyle(.tertiary)
+
+                        Button("Cancel") {
+                            viewModel.cancelOperation()
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .controlSize(.small)
                     }
                 }
             }
@@ -114,6 +135,13 @@ struct ProgressOverlayView: View {
             )
         }
     }
+}
+
+private func formatETA(_ seconds: TimeInterval) -> String {
+    if seconds < 60 { return "\(Int(seconds))s" }
+    let m = Int(seconds) / 60
+    let s = Int(seconds) % 60
+    return "\(m)m \(s)s"
 }
 
 // MARK: - Duplicate Resolver Sheet
@@ -287,5 +315,9 @@ struct PrimaryToolbarButtonStyle: ButtonStyle {
 extension URL {
     var abbreviatingWithTildeInPath: String {
         (self.path as NSString).abbreviatingWithTildeInPath
+    }
+
+    var isDirectory: Bool {
+        (try? resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
     }
 }

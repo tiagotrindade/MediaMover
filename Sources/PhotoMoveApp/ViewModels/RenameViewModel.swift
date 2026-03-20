@@ -36,6 +36,12 @@ final class RenameViewModel {
     var renamedCount: Int = 0
     var errorCount: Int = 0
 
+    // Progress ETA
+    var filesPerSecond: Double = 0
+    var estimatedTimeRemaining: TimeInterval = 0
+    private var operationStartTime: Date?
+    private var currentTask: Task<Void, Never>?
+
     struct RenamePreview: Identifiable {
         let id = UUID()
         let originalName: String
@@ -71,12 +77,19 @@ final class RenameViewModel {
 
     // MARK: - Scan + Preview
 
+    func startScan() {
+        currentTask = Task { await scanAndPreview() }
+    }
+
     func scanAndPreview() async {
         guard let source = sourceURL else { return }
         isScanning = true
         discoveredFiles = []
         previewItems = []
         renameComplete = false
+        operationStartTime = Date()
+        currentFileIndex = 0
+        progress = 0
 
         let urls = FileEnumerator.enumerateMedia(
             in: source,
@@ -92,6 +105,7 @@ final class RenameViewModel {
         let batchSize = 8
 
         for batchStart in stride(from: 0, to: urls.count, by: batchSize) {
+            if Task.isCancelled { break }
             let batchEnd = min(batchStart + batchSize, urls.count)
             let batch = Array(urls[batchStart..<batchEnd])
 
@@ -104,16 +118,19 @@ final class RenameViewModel {
                 return results
             }
             files.append(contentsOf: batchResults)
+            currentFileIndex = files.count
+            progress = urls.count > 0 ? Double(files.count) / Double(urls.count) : 0
+            updateETA(processed: files.count, total: urls.count)
         }
 
-        // Sort by date
-        files.sort { ($0.effectiveDate(fallback: dateFallback) ?? .distantPast) < ($1.effectiveDate(fallback: dateFallback) ?? .distantPast) }
-        discoveredFiles = files
-
-        // Generate preview
-        regeneratePreviewFromFiles(files)
+        if !Task.isCancelled {
+            files.sort { ($0.effectiveDate(fallback: dateFallback) ?? .distantPast) < ($1.effectiveDate(fallback: dateFallback) ?? .distantPast) }
+            discoveredFiles = files
+            regeneratePreviewFromFiles(files)
+        }
 
         isScanning = false
+        operationStartTime = nil
     }
 
     // MARK: - Regenerate Preview (pattern change only, no rescan)
@@ -174,12 +191,19 @@ final class RenameViewModel {
 
     // MARK: - Execute Rename
 
+    func beginRename() {
+        currentTask = Task { await executeRename() }
+    }
+
     func executeRename() async {
         guard !previewItems.isEmpty else { return }
         isRenaming = true
         progress = 0
         renamedCount = 0
         errorCount = 0
+        operationStartTime = Date()
+        filesPerSecond = 0
+        estimatedTimeRemaining = 0
 
         let fm = FileManager.default
         let total = previewItems.count
@@ -192,10 +216,12 @@ final class RenameViewModel {
         }
 
         for (index, item) in previewItems.enumerated() {
+            if Task.isCancelled { break }
             currentFileIndex = index + 1
             totalFiles = total
             currentFileName = item.originalName
             progress = Double(index + 1) / Double(total)
+            updateETA(processed: index + 1, total: total)
 
             let targetDir: URL
             if isCopy, let dest = destinationURL {
@@ -234,6 +260,26 @@ final class RenameViewModel {
 
         isRenaming = false
         renameComplete = true
+        operationStartTime = nil
+        filesPerSecond = 0
+        estimatedTimeRemaining = 0
+    }
+
+    // MARK: - Cancel
+
+    func cancelOperation() {
+        currentTask?.cancel()
+        currentTask = nil
+    }
+
+    // MARK: - ETA
+
+    private func updateETA(processed: Int, total: Int) {
+        guard let start = operationStartTime, processed > 0 else { return }
+        let elapsed = Date().timeIntervalSince(start)
+        filesPerSecond = Double(processed) / elapsed
+        let remaining = total - processed
+        estimatedTimeRemaining = remaining > 0 ? Double(remaining) / filesPerSecond : 0
     }
 
     // MARK: - Reset

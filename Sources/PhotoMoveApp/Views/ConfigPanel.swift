@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConfigPanel: View {
     @Bindable var viewModel: OrganizerViewModel
+    @State private var isDestDropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -71,6 +72,22 @@ struct ConfigPanel: View {
                 )
             }
             .buttonStyle(.plain)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(2)
+                    .opacity(isDestDropTargeted ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.15), value: isDestDropTargeted)
+            )
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first, url.isDirectory else { return false }
+                viewModel.destinationURL = url
+                viewModel.result = nil
+                return true
+            } isTargeted: {
+                isDestDropTargeted = $0
+            }
     }
 
     // MARK: - Folder Structure

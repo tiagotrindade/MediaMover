@@ -61,6 +61,7 @@ actor FileOrganizer {
         let logger = ActivityLogger.shared
 
         for (index, file) in files.enumerated() {
+            if Task.isCancelled { break }
             await progressCallback(index + 1, files.count, file.fileName)
 
             // Determine the effective date using the configured fallback

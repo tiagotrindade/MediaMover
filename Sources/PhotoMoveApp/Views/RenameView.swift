@@ -25,7 +25,7 @@ struct RenameView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    Task { await viewModel.executeRename() }
+                    viewModel.beginRename()
                 } label: {
                     HStack(spacing: 5) {
                         Text(viewModel.renameMode == .copyToFolder ? "Copy & Rename" : "Rename All")
@@ -54,6 +54,7 @@ struct RenameView: View {
 
 struct RenameSourcePanel: View {
     @Bindable var viewModel: RenameViewModel
+    @State private var isSourceDropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -100,6 +101,25 @@ struct RenameSourcePanel: View {
                 )
             }
             .buttonStyle(.plain).padding(10)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(4)
+                    .opacity(isSourceDropTargeted ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.15), value: isSourceDropTargeted)
+            )
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first, url.isDirectory else { return false }
+                viewModel.sourceURL = url
+                viewModel.discoveredFiles = []
+                viewModel.previewItems = []
+                viewModel.renameComplete = false
+                viewModel.startScan()
+                return true
+            } isTargeted: {
+                isSourceDropTargeted = $0
+            }
 
             Divider()
 
@@ -113,7 +133,7 @@ struct RenameSourcePanel: View {
                 }
                 .toggleStyle(.checkbox)
                 Spacer()
-                Button("Scan") { Task { await viewModel.scanAndPreview() } }
+                Button("Scan") { viewModel.startScan() }
                     .buttonStyle(SecondaryButtonStyle()).controlSize(.small)
                     .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isRenaming)
             }
@@ -148,6 +168,7 @@ struct RenameSourcePanel: View {
 
 struct RenameConfigPanel: View {
     @Bindable var viewModel: RenameViewModel
+    @State private var isDestDropTargeted = false
 
     var body: some View {
         ScrollView {
@@ -198,6 +219,21 @@ struct RenameConfigPanel: View {
                 )
             }
             .buttonStyle(.plain)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(2)
+                    .opacity(isDestDropTargeted ? 1 : 0)
+                    .animation(.easeInOut(duration: 0.15), value: isDestDropTargeted)
+            )
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first, url.isDirectory else { return false }
+                viewModel.destinationURL = url
+                return true
+            } isTargeted: {
+                isDestDropTargeted = $0
+            }
         }
     }
 
@@ -396,16 +432,37 @@ struct RenameProgressOverlay: View {
                 .background(.ultraThinMaterial)
             VStack(spacing: 12) {
                 ProgressView(value: viewModel.progress)
-                    .progressViewStyle(.linear).frame(width: 280).tint(Color.accentColor)
+                    .progressViewStyle(.linear).frame(width: 320).tint(Color.accentColor)
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
                     Text(viewModel.isScanning ? "Scanning files…" : "\(viewModel.renameMode == .copyToFolder ? "Copying" : "Renaming"): \(viewModel.currentFileName)")
                         .font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1)
                 }
-                if viewModel.isRenaming {
+
+                HStack(spacing: 12) {
                     Text("\(viewModel.currentFileIndex) / \(viewModel.totalFiles)")
-                        .font(.system(size: 11)).foregroundStyle(.tertiary)
+                        .font(.system(size: 11, design: .monospaced))
+                    Text("·").foregroundStyle(.quaternary)
+                    Text("\(Int(viewModel.progress * 100))%")
+                        .font(.system(size: 11, weight: .medium))
+                    if viewModel.filesPerSecond > 0 {
+                        Text("·").foregroundStyle(.quaternary)
+                        Text(String(format: "%.1f files/s", viewModel.filesPerSecond))
+                            .font(.system(size: 11))
+                        if viewModel.estimatedTimeRemaining > 1 {
+                            Text("·").foregroundStyle(.quaternary)
+                            Text("ETA \(formatRenameETA(viewModel.estimatedTimeRemaining))")
+                                .font(.system(size: 11))
+                        }
+                    }
                 }
+                .foregroundStyle(.tertiary)
+
+                Button("Cancel") {
+                    viewModel.cancelOperation()
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .controlSize(.small)
             }
             .padding(32)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -413,4 +470,11 @@ struct RenameProgressOverlay: View {
                 .shadow(color: .black.opacity(0.15), radius: 20, y: 8))
         }
     }
+}
+
+private func formatRenameETA(_ seconds: TimeInterval) -> String {
+    if seconds < 60 { return "\(Int(seconds))s" }
+    let m = Int(seconds) / 60
+    let s = Int(seconds) % 60
+    return "\(m)m \(s)s"
 }

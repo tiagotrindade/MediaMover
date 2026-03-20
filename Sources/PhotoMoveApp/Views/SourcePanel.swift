@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SourcePanel: View {
     @Bindable var viewModel: OrganizerViewModel
+    @State private var isSourceDropTargeted = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -66,6 +67,24 @@ struct SourcePanel: View {
         }
         .buttonStyle(.plain)
         .padding(10)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                .foregroundStyle(Color.accentColor)
+                .padding(4)
+                .opacity(isSourceDropTargeted ? 1 : 0)
+                .animation(.easeInOut(duration: 0.15), value: isSourceDropTargeted)
+        )
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first, url.isDirectory else { return false }
+            viewModel.sourceURL = url
+            viewModel.discoveredFiles = []
+            viewModel.result = nil
+            viewModel.startScan()
+            return true
+        } isTargeted: {
+            isSourceDropTargeted = $0
+        }
     }
 
     // MARK: - File list
@@ -121,7 +140,7 @@ struct SourcePanel: View {
             Spacer()
 
             Button("Scan") {
-                Task { await viewModel.scanFiles() }
+                viewModel.startScan()
             }
             .buttonStyle(SecondaryButtonStyle())
             .controlSize(.small)
@@ -136,10 +155,13 @@ struct SourcePanel: View {
 struct SourceFileRow: View {
     let file: MediaFile
     let index: Int
+    @State private var thumbnail: NSImage?
 
     var body: some View {
         HStack(spacing: 6) {
-            fileIcon.font(.system(size: 10)).frame(width: 14)
+            thumbnailView
+                .frame(width: 30, height: 30)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
             Text(file.fileName)
                 .font(.system(size: 11, design: .monospaced))
                 .foregroundStyle(.primary).lineLimit(1)
@@ -147,8 +169,30 @@ struct SourceFileRow: View {
             Text(ByteCountFormatter.string(fromByteCount: file.fileSize, countStyle: .file))
                 .font(.system(size: 10)).foregroundStyle(.tertiary)
         }
-        .padding(.horizontal, 10).padding(.vertical, 4)
+        .padding(.horizontal, 10).padding(.vertical, 3)
         .background(index % 2 == 0 ? Color.clear : Color(NSColor.controlBackgroundColor).opacity(0.4))
+        .task(id: file.id) {
+            let service = ThumbnailService.shared
+            if let cached = service.thumbnail(for: file.url, mediaType: file.mediaType) {
+                thumbnail = cached
+                return
+            }
+            service.loadThumbnail(for: file.url, mediaType: file.mediaType) { [file] image in
+                thumbnail = image
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        if let thumb = thumbnail {
+            Image(nsImage: thumb)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+        } else {
+            fileIcon.font(.system(size: 12)).frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        }
     }
 
     @ViewBuilder
