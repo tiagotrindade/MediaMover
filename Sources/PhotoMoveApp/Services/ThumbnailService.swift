@@ -7,50 +7,34 @@ final class ThumbnailService {
     static let shared = ThumbnailService()
 
     private let cache = NSCache<NSURL, NSImage>()
-    private var inflight: Set<URL> = []
 
     private init() {
         cache.countLimit = 2000
     }
 
-    func thumbnail(for url: URL, mediaType: MediaType) -> NSImage? {
-        cache.object(forKey: url as NSURL)
-    }
-
-    func loadThumbnail(for url: URL, mediaType: MediaType, completion: (@MainActor @Sendable (NSImage?) -> Void)? = nil) {
+    func thumbnail(for url: URL, mediaType: MediaType) async -> NSImage? {
         if let cached = cache.object(forKey: url as NSURL) {
-            completion?(cached)
-            return
+            return cached
         }
-        guard !inflight.contains(url) else { return }
-        inflight.insert(url)
 
         let fileURL = url
         let type = mediaType
-        Task.detached(priority: .utility) {
-            let image: NSImage?
+        let image: NSImage? = await Task.detached(priority: .utility) {
             switch type {
-            case .photo:
-                image = generateImageThumbnail(url: fileURL)
-            case .video:
-                image = await generateVideoThumbnail(url: fileURL)
-            case .other:
-                image = await generateSystemIcon(for: fileURL)
+            case .photo:  return generateImageThumbnail(url: fileURL)
+            case .video:  return await generateVideoThumbnail(url: fileURL)
+            case .other:  return await generateSystemIcon(for: fileURL)
             }
+        }.value
 
-            await MainActor.run { [weak self] in
-                if let image {
-                    self?.cache.setObject(image, forKey: fileURL as NSURL)
-                }
-                self?.inflight.remove(fileURL)
-                completion?(image)
-            }
+        if let image {
+            cache.setObject(image, forKey: url as NSURL)
         }
+        return image
     }
 
     func clearCache() {
         cache.removeAllObjects()
-        inflight.removeAll()
     }
 }
 

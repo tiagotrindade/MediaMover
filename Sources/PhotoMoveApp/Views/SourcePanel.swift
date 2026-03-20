@@ -172,14 +172,7 @@ struct SourceFileRow: View {
         .padding(.horizontal, 10).padding(.vertical, 3)
         .background(index % 2 == 0 ? Color.clear : Color(NSColor.controlBackgroundColor).opacity(0.4))
         .task(id: file.id) {
-            let service = ThumbnailService.shared
-            if let cached = service.thumbnail(for: file.url, mediaType: file.mediaType) {
-                thumbnail = cached
-                return
-            }
-            service.loadThumbnail(for: file.url, mediaType: file.mediaType) { [file] image in
-                thumbnail = image
-            }
+            thumbnail = await ThumbnailService.shared.thumbnail(for: file.url, mediaType: file.mediaType)
         }
     }
 

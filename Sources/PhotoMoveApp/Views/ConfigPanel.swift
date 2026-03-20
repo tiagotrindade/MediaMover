@@ -6,9 +6,14 @@ struct ConfigPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            sectionHeader("Destination")
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+            HStack {
+                Text("DESTINATION")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .tracking(0.5)
+                Spacer()
+            }
+            .padding(.horizontal, 12).padding(.vertical, 10)
             Divider()
             ScrollView {
                 VStack(spacing: 18) {
