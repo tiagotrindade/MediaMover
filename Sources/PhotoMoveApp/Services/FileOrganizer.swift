@@ -32,6 +32,35 @@ struct OrganizerConfig: Sendable {
     let separateVideos: Bool                     // put videos in a "Videos" subfolder
     let renameWithDate: Bool                     // prepend YYYYMMDD_HHMMSSmmm_ to filename
     let separateByCamera: Bool                   // add camera-name subfolder
+
+    // Template-based folder pattern (Phase 2). When set, overrides `pattern`.
+    let folderTemplate: String?
+
+    init(
+        mode: OperationMode,
+        pattern: OrganizationPattern,
+        duplicateStrategy: DuplicateStrategy,
+        duplicateAction: DuplicateAction,
+        verifyIntegrity: Bool,
+        hashAlgorithm: HashAlgorithm,
+        dateFallback: DateFallback,
+        separateVideos: Bool,
+        renameWithDate: Bool,
+        separateByCamera: Bool,
+        folderTemplate: String? = nil
+    ) {
+        self.mode = mode
+        self.pattern = pattern
+        self.duplicateStrategy = duplicateStrategy
+        self.duplicateAction = duplicateAction
+        self.verifyIntegrity = verifyIntegrity
+        self.hashAlgorithm = hashAlgorithm
+        self.dateFallback = dateFallback
+        self.separateVideos = separateVideos
+        self.renameWithDate = renameWithDate
+        self.separateByCamera = separateByCamera
+        self.folderTemplate = folderTemplate
+    }
 }
 
 // MARK: - Duplicate resolution callback (for "Ask" mode)
@@ -73,11 +102,20 @@ actor FileOrganizer {
                 continue
             }
 
-            var subpath = config.pattern.destinationSubpath(for: effectiveDate, camera: file.cameraModel)
+            var subpath: String
+            if let template = config.folderTemplate {
+                // Template-based path (Phase 2)
+                let context = file.templateContext(fallback: config.dateFallback, sequenceNumber: index + 1)
+                subpath = TemplateEngine.evaluate(template: template, context: context)
+            } else {
+                // Legacy pattern-based path
+                subpath = config.pattern.destinationSubpath(for: effectiveDate, camera: file.cameraModel)
+            }
 
             // Add camera subfolder if enabled and camera info is available
             // BUG-03 FIX: Skip if the pattern already includes camera in the path
-            if config.separateByCamera, !config.pattern.includesCamera,
+            if config.folderTemplate == nil,
+               config.separateByCamera, !config.pattern.includesCamera,
                let camera = file.cameraModel, !camera.isEmpty {
                 let safeCam = sanitizeFolderName(camera)
                 subpath += "/\(safeCam)"

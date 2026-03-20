@@ -36,6 +36,20 @@ final class OrganizerViewModel {
     var verifyIntegrity: Bool = true
     var hashAlgorithm: HashAlgorithm = .xxhash64
 
+    // MARK: - Phase 2: Template & Profiles
+
+    /// Custom folder template string. Overrides the legacy `pattern` enum.
+    var folderTemplate: String = "{YYYY}_{MM}_{DD}"
+
+    /// Template validation errors (live feedback in UI).
+    var templateValidation: TemplateValidation = .valid
+
+    /// Whether GPS reverse geocoding is enabled.
+    var geocodingEnabled: Bool = true
+
+    /// Geocoding progress message.
+    var geocodingMessage: String = ""
+
     // MARK: - State
 
     var isScanning: Bool = false
@@ -108,6 +122,7 @@ final class OrganizerViewModel {
         guard let source = sourceURL else { return }
         isScanning = true
         discoveredFiles = []
+        previewItems = []
         result = nil
         scanMessage = "Scanning files..."
         operationStartTime = Date()
@@ -155,6 +170,15 @@ final class OrganizerViewModel {
         }
 
         if !Task.isCancelled {
+            // Reverse geocode GPS coordinates if enabled
+            let hasGPSFiles = files.contains(where: { $0.hasGPS })
+            if geocodingEnabled && hasGPSFiles {
+                scanMessage = "Resolving locations..."
+                geocodingMessage = "Resolving GPS locations..."
+                await GeocodingService.shared.resolveLocations(for: &files)
+                geocodingMessage = ""
+            }
+
             discoveredFiles = files.sorted {
                 ($0.effectiveDate() ?? .distantPast) > ($1.effectiveDate() ?? .distantPast)
             }
@@ -168,18 +192,21 @@ final class OrganizerViewModel {
     // MARK: - Preview Generation
 
     func generatePreview() {
+        // Validate template
+        templateValidation = TemplateEngine.validate(folderTemplate)
+
         var previews: [MoverPreview] = []
-        for file in discoveredFiles {
+        let tokens = TemplateEngine.parse(folderTemplate)
+
+        for (index, file) in discoveredFiles.enumerated() {
             let date = file.effectiveDate(fallback: dateFallback)
             var subpath: String
-            if let date {
-                subpath = pattern.destinationSubpath(for: date, camera: file.cameraModel)
-                // Add camera subfolder (must come before Videos to match FileOrganizer order)
-                if separateByCamera, !pattern.includesCamera, let cam = file.cameraModel, !cam.isEmpty {
-                    let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|")
-                    let safeCam = cam.components(separatedBy: illegal).joined(separator: "_").trimmingCharacters(in: .whitespaces)
-                    subpath += "/\(safeCam)"
-                }
+
+            if date != nil || folderTemplate.isEmpty == false {
+                // Use template engine for folder path
+                let context = file.templateContext(fallback: dateFallback, sequenceNumber: index + 1)
+                subpath = TemplateEngine.evaluate(tokens: tokens, context: context)
+
                 // Add video subfolder
                 if separateVideos && file.mediaType == .video {
                     subpath += "/Videos"
@@ -243,7 +270,8 @@ final class OrganizerViewModel {
             dateFallback: dateFallback,
             separateVideos: separateVideos,
             renameWithDate: renameWithDate,
-            separateByCamera: separateByCamera
+            separateByCamera: separateByCamera,
+            folderTemplate: folderTemplate
         )
 
         // Duplicate resolver for "Ask" mode
@@ -286,7 +314,9 @@ final class OrganizerViewModel {
             await OperationHistory.shared.addBatch(batch)
         }
 
-        result = opResult
+        if !Task.isCancelled {
+            result = opResult
+        }
         isProcessing = false
         operationStartTime = nil
         filesPerSecond = 0
@@ -364,6 +394,12 @@ final class OrganizerViewModel {
         duplicateContinuation = nil
     }
 
+    /// Safety net: resume continuation with nil (skip) if sheet dismissed without resolving
+    func safeDismissDuplicate() {
+        guard duplicateContinuation != nil else { return }
+        resolveDuplicate(action: nil)
+    }
+
     // MARK: - Cancel
 
     func cancelOperation() {
@@ -376,6 +412,7 @@ final class OrganizerViewModel {
     private func updateETA(processed: Int, total: Int) {
         guard let start = operationStartTime, processed > 0 else { return }
         let elapsed = Date().timeIntervalSince(start)
+        guard elapsed > 0.001 else { return }
         filesPerSecond = Double(processed) / elapsed
         let remaining = total - processed
         estimatedTimeRemaining = remaining > 0 ? Double(remaining) / filesPerSecond : 0
@@ -405,7 +442,7 @@ final class OrganizerViewModel {
         return panel.url
     }
 
-    private static func buildMediaFile(from url: URL) async -> MediaFile? {
+    static func buildMediaFile(from url: URL) async -> MediaFile? {
         let fm = FileManager.default
         guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
 
@@ -416,32 +453,47 @@ final class OrganizerViewModel {
         let ext = url.pathExtension.lowercased()
         let mediaType = SupportedFormats.mediaType(for: ext)
 
-        let dateTaken: Date?
-        let cameraModel: String?
-
         switch mediaType {
         case .photo:
-            let meta = MetadataExtractor.extractPhotoMetadata(from: url)
-            dateTaken = meta.dateTaken
-            cameraModel = meta.cameraModel
+            let meta = MetadataExtractor.extractExtendedPhotoMetadata(from: url)
+            return MediaFile(
+                url: url,
+                dateTaken: meta.dateTaken,
+                cameraModel: meta.cameraModel,
+                fileCreationDate: creationDate,
+                fileModificationDate: modDate,
+                fileSize: fileSize,
+                mediaType: mediaType,
+                lensModel: meta.lensModel,
+                iso: meta.iso,
+                aperture: meta.aperture,
+                shutterSpeed: meta.shutterSpeed,
+                gpsLatitude: meta.gpsLatitude,
+                gpsLongitude: meta.gpsLongitude
+            )
         case .video:
-            let meta = await MetadataExtractor.extractVideoMetadata(from: url)
-            dateTaken = meta.dateTaken
-            cameraModel = meta.cameraModel
+            let meta = await MetadataExtractor.extractExtendedVideoMetadata(from: url)
+            return MediaFile(
+                url: url,
+                dateTaken: meta.dateTaken,
+                cameraModel: meta.cameraModel,
+                fileCreationDate: creationDate,
+                fileModificationDate: modDate,
+                fileSize: fileSize,
+                mediaType: mediaType,
+                gpsLatitude: meta.gpsLatitude,
+                gpsLongitude: meta.gpsLongitude
+            )
         case .other, nil:
-            // Non-media files — no metadata extraction
-            dateTaken = nil
-            cameraModel = nil
+            return MediaFile(
+                url: url,
+                dateTaken: nil,
+                cameraModel: nil,
+                fileCreationDate: creationDate,
+                fileModificationDate: modDate,
+                fileSize: fileSize,
+                mediaType: mediaType
+            )
         }
-
-        return MediaFile(
-            url: url,
-            dateTaken: dateTaken,
-            cameraModel: cameraModel,
-            fileCreationDate: creationDate,
-            fileModificationDate: modDate,
-            fileSize: fileSize,
-            mediaType: mediaType
-        )
     }
 }

@@ -45,7 +45,8 @@ enum RenamePattern: String, CaseIterable, Identifiable, Sendable {
     ) -> String {
         let ext = (originalName as NSString).pathExtension.lowercased()
         let stem = (originalName as NSString).deletingPathExtension
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
         let y = cal.component(.year, from: date)
         let mo = cal.component(.month, from: date)
         let d = cal.component(.day, from: date)

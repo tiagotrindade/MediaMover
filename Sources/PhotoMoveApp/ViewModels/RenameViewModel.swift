@@ -22,6 +22,38 @@ final class RenameViewModel {
     var dateFallback: DateFallback = .creationDate
     var renameMode: RenameMode = .renameInPlace
 
+    // MARK: - Phase 2: Regex Rename
+
+    /// Whether regex rename mode is active (replaces pattern-based rename).
+    var useRegexMode: Bool = false
+
+    /// Regex find pattern.
+    var regexFind: String = ""
+
+    /// Regex replacement string (supports $1, $2, etc.).
+    var regexReplace: String = ""
+
+    /// Regex options.
+    var regexCaseInsensitive: Bool = false
+
+    /// Whether to match on the whole filename or just the stem (without extension).
+    var regexMatchStemOnly: Bool = true
+
+    /// Regex validation error (shown inline).
+    var regexError: String?
+
+    /// Number of files that matched the regex.
+    var regexMatchCount: Int = 0
+
+    /// Common regex patterns for the dropdown.
+    static let commonRegexPatterns: [(name: String, find: String, replace: String)] = [
+        ("Remove prefix IMG_",      "^IMG_",                  ""),
+        ("Replace spaces with _",   "\\s+",                   "_"),
+        ("Extract date digits",     "(\\d{4})(\\d{2})(\\d{2})", "$1-$2-$3"),
+        ("Remove trailing numbers", "_\\d+$",                 ""),
+        ("Lowercase all",           "([A-Z])",                "$1"),  // placeholder — handled specially
+    ]
+
     // MARK: - State
 
     var isScanning: Bool = false
@@ -136,7 +168,11 @@ final class RenameViewModel {
     // MARK: - Regenerate Preview (pattern change only, no rescan)
 
     func regeneratePreview() {
-        regeneratePreviewFromFiles(discoveredFiles)
+        if useRegexMode {
+            regenerateRegexPreview()
+        } else {
+            regeneratePreviewFromFiles(discoveredFiles)
+        }
     }
 
     private func regeneratePreviewFromFiles(_ files: [MediaFile]) {
@@ -167,6 +203,83 @@ final class RenameViewModel {
             }
         }
         previewItems = previews
+    }
+
+    // MARK: - Regex Rename Preview
+
+    private func regenerateRegexPreview() {
+        regexError = nil
+        regexMatchCount = 0
+
+        guard !regexFind.isEmpty else {
+            previewItems = discoveredFiles.map {
+                RenamePreview(originalName: $0.fileName, newName: $0.fileName, file: $0)
+            }
+            return
+        }
+
+        // Validate regex
+        var options: NSRegularExpression.Options = []
+        if regexCaseInsensitive { options.insert(.caseInsensitive) }
+
+        let regex: NSRegularExpression
+        do {
+            regex = try NSRegularExpression(pattern: regexFind, options: options)
+        } catch {
+            regexError = error.localizedDescription
+            previewItems = discoveredFiles.map {
+                RenamePreview(originalName: $0.fileName, newName: $0.fileName, file: $0)
+            }
+            return
+        }
+
+        var previews: [RenamePreview] = []
+        var matchCount = 0
+
+        for file in discoveredFiles {
+            let ext = (file.fileName as NSString).pathExtension
+            let stem = (file.fileName as NSString).deletingPathExtension
+            let target = regexMatchStemOnly ? stem : file.fileName
+            let range = NSRange(target.startIndex..., in: target)
+
+            let hasMatch = regex.firstMatch(in: target, range: range) != nil
+            if hasMatch { matchCount += 1 }
+
+            let replaced = regex.stringByReplacingMatches(in: target, range: range, withTemplate: regexReplace)
+
+            let newName: String
+            if regexMatchStemOnly {
+                newName = ext.isEmpty ? replaced : "\(replaced).\(ext)"
+            } else {
+                newName = replaced
+            }
+
+            previews.append(RenamePreview(
+                originalName: file.fileName,
+                newName: newName.isEmpty ? file.fileName : newName,
+                file: file
+            ))
+        }
+
+        regexMatchCount = matchCount
+        previewItems = previews
+    }
+
+    /// Get the regex match ranges for highlighting in the UI.
+    func regexMatchRanges(in fileName: String) -> [Range<String.Index>] {
+        guard !regexFind.isEmpty else { return [] }
+        var options: NSRegularExpression.Options = []
+        if regexCaseInsensitive { options.insert(.caseInsensitive) }
+        guard let regex = try? NSRegularExpression(pattern: regexFind, options: options) else { return [] }
+
+        let stem = (fileName as NSString).deletingPathExtension
+        let target = regexMatchStemOnly ? stem : fileName
+        let nsRange = NSRange(target.startIndex..., in: target)
+        let matches = regex.matches(in: target, range: nsRange)
+
+        return matches.compactMap { match in
+            Range(match.range, in: target)
+        }
     }
 
     /// Limited rename for non-media files: only date prefix + original name, using file dates
@@ -259,7 +372,7 @@ final class RenameViewModel {
         }
 
         isRenaming = false
-        renameComplete = true
+        renameComplete = !Task.isCancelled
         operationStartTime = nil
         filesPerSecond = 0
         estimatedTimeRemaining = 0
@@ -277,6 +390,7 @@ final class RenameViewModel {
     private func updateETA(processed: Int, total: Int) {
         guard let start = operationStartTime, processed > 0 else { return }
         let elapsed = Date().timeIntervalSince(start)
+        guard elapsed > 0.001 else { return }
         filesPerSecond = Double(processed) / elapsed
         let remaining = total - processed
         estimatedTimeRemaining = remaining > 0 ? Double(remaining) / filesPerSecond : 0
@@ -310,31 +424,6 @@ final class RenameViewModel {
     }
 
     private static func buildMediaFile(from url: URL) async -> MediaFile? {
-        let fm = FileManager.default
-        guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
-        let modDate = (attrs[.modificationDate] as? Date) ?? Date()
-        let creationDate = attrs[.creationDate] as? Date
-        let fileSize = (attrs[.size] as? Int64) ?? 0
-        let ext = url.pathExtension.lowercased()
-        let mediaType = SupportedFormats.mediaType(for: ext)
-
-        let dateTaken: Date?
-        let cameraModel: String?
-        switch mediaType {
-        case .photo:
-            let meta = MetadataExtractor.extractPhotoMetadata(from: url)
-            dateTaken = meta.dateTaken; cameraModel = meta.cameraModel
-        case .video:
-            let meta = await MetadataExtractor.extractVideoMetadata(from: url)
-            dateTaken = meta.dateTaken; cameraModel = meta.cameraModel
-        case .other, nil:
-            dateTaken = nil; cameraModel = nil
-        }
-
-        return MediaFile(
-            url: url, dateTaken: dateTaken, cameraModel: cameraModel,
-            fileCreationDate: creationDate, fileModificationDate: modDate,
-            fileSize: fileSize, mediaType: mediaType
-        )
+        await OrganizerViewModel.buildMediaFile(from: url)
     }
 }

@@ -25,6 +25,20 @@ struct MediaFile: Identifiable, Sendable {
     let fileCreationDate: Date?
     let fileModificationDate: Date
 
+    // Extended EXIF metadata (Phase 2)
+    let lensModel: String?
+    let iso: String?
+    let aperture: String?
+    let shutterSpeed: String?
+    let gpsLatitude: Double?
+    let gpsLongitude: Double?
+
+    // Resolved location (filled after reverse geocoding)
+    var locationCity: String?
+    var locationCountry: String?
+    var locationState: String?
+    var locationLocality: String?
+
     /// Returns the best available date given the user's fallback preference.
     func effectiveDate(fallback: DateFallback = .creationDate) -> Date? {
         if let dateTaken { return dateTaken }
@@ -38,7 +52,44 @@ struct MediaFile: Identifiable, Sendable {
         }
     }
 
-    init(url: URL, dateTaken: Date?, cameraModel: String?, fileCreationDate: Date?, fileModificationDate: Date, fileSize: Int64, mediaType: MediaType? = nil) {
+    /// Whether this file has GPS coordinates.
+    var hasGPS: Bool {
+        gpsLatitude != nil && gpsLongitude != nil
+    }
+
+    /// Build a TemplateContext from this MediaFile for template evaluation.
+    func templateContext(fallback: DateFallback = .creationDate, sequenceNumber: Int = 1) -> TemplateContext {
+        TemplateContext(
+            date: effectiveDate(fallback: fallback),
+            cameraModel: cameraModel,
+            lensModel: lensModel,
+            iso: iso,
+            aperture: aperture,
+            shutterSpeed: shutterSpeed,
+            originalFileName: fileName,
+            sequenceNumber: sequenceNumber,
+            city: locationCity,
+            country: locationCountry,
+            state: locationState,
+            locality: locationLocality
+        )
+    }
+
+    init(
+        url: URL,
+        dateTaken: Date?,
+        cameraModel: String?,
+        fileCreationDate: Date?,
+        fileModificationDate: Date,
+        fileSize: Int64,
+        mediaType: MediaType? = nil,
+        lensModel: String? = nil,
+        iso: String? = nil,
+        aperture: String? = nil,
+        shutterSpeed: String? = nil,
+        gpsLatitude: Double? = nil,
+        gpsLongitude: Double? = nil
+    ) {
         self.url = url
         self.fileName = url.lastPathComponent
         self.fileExtension = url.pathExtension.lowercased()
@@ -48,5 +99,11 @@ struct MediaFile: Identifiable, Sendable {
         self.cameraModel = cameraModel
         self.fileCreationDate = fileCreationDate
         self.fileModificationDate = fileModificationDate
+        self.lensModel = lensModel
+        self.iso = iso
+        self.aperture = aperture
+        self.shutterSpeed = shutterSpeed
+        self.gpsLatitude = gpsLatitude
+        self.gpsLongitude = gpsLongitude
     }
 }

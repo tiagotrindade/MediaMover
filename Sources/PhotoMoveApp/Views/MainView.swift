@@ -52,9 +52,12 @@ struct MoverView: View {
             }
         }
         .task { await viewModel.refreshUndoState() }
-        .sheet(isPresented: $viewModel.showDuplicateDialog) {
+        .sheet(isPresented: $viewModel.showDuplicateDialog, onDismiss: {
+            viewModel.safeDismissDuplicate()
+        }) {
             DuplicateResolverSheet(viewModel: viewModel)
         }
+        .interactiveDismissDisabled(viewModel.showDuplicateDialog)
         .sheet(item: $viewModel.result) { result in
             ResultsView(result: result, onDismiss: { viewModel.result = nil })
                 .frame(minWidth: 500, minHeight: 400)

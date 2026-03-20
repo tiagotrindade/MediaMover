@@ -1,0 +1,137 @@
+import Foundation
+import CoreLocation
+
+/// Reverse geocoding service with in-memory + disk caching.
+/// Coordinates are rounded to ~3 decimal places (~110m precision) for cache deduplication.
+actor GeocodingService {
+
+    static let shared = GeocodingService()
+
+    // MARK: - Cache
+
+    private var memoryCache: [String: LocationInfo] = [:]
+    private let cacheURL: URL
+    private let geocoder = CLGeocoder()
+    private var pendingRequests: [String: [CheckedContinuation<LocationInfo?, Never>]] = [:]
+
+    // Rate limiting: CLGeocoder allows ~50 requests/minute
+    private var lastRequestTime: Date = .distantPast
+    private let minRequestInterval: TimeInterval = 1.2  // ~50/min with margin
+
+    struct LocationInfo: Codable, Sendable {
+        let city: String?
+        let country: String?
+        let state: String?
+        let locality: String?
+    }
+
+    private init() {
+        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let appDir = support.appendingPathComponent("FolioSort")
+        try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
+        cacheURL = appDir.appendingPathComponent("geocoding_cache.json")
+
+        // Load disk cache
+        if let data = try? Data(contentsOf: cacheURL),
+           let decoded = try? JSONDecoder().decode([String: LocationInfo].self, from: data) {
+            memoryCache = decoded
+        }
+    }
+
+    // MARK: - Public API
+
+    /// Reverse geocode a coordinate. Returns cached result if available.
+    func reverseGeocode(latitude: Double, longitude: Double) async -> LocationInfo? {
+        let key = cacheKey(latitude: latitude, longitude: longitude)
+
+        // Check cache first
+        if let cached = memoryCache[key] {
+            return cached
+        }
+
+        // Coalesce concurrent requests for the same key
+        if pendingRequests[key] != nil {
+            return await withCheckedContinuation { continuation in
+                pendingRequests[key]?.append(continuation)
+            }
+        }
+
+        pendingRequests[key] = []
+
+        // Rate limiting
+        let now = Date()
+        let elapsed = now.timeIntervalSince(lastRequestTime)
+        if elapsed < minRequestInterval {
+            try? await Task.sleep(nanoseconds: UInt64((minRequestInterval - elapsed) * 1_000_000_000))
+        }
+        lastRequestTime = Date()
+
+        // Perform geocoding
+        let location = CLLocation(latitude: latitude, longitude: longitude)
+        let result: LocationInfo?
+
+        do {
+            let placemarks = try await geocoder.reverseGeocodeLocation(location)
+            if let placemark = placemarks.first {
+                result = LocationInfo(
+                    city: placemark.locality,
+                    country: placemark.country,
+                    state: placemark.administrativeArea,
+                    locality: placemark.subLocality
+                )
+            } else {
+                result = nil
+            }
+        } catch {
+            result = nil
+        }
+
+        // Cache result (even nil → store empty info to avoid re-requesting)
+        let info = result ?? LocationInfo(city: nil, country: nil, state: nil, locality: nil)
+        memoryCache[key] = info
+        saveCacheToDisk()
+
+        // Resume pending continuations
+        let pending = pendingRequests.removeValue(forKey: key) ?? []
+        for continuation in pending {
+            continuation.resume(returning: result)
+        }
+
+        return result
+    }
+
+    /// Batch resolve locations for multiple files. Modifies files in-place.
+    func resolveLocations(for files: inout [MediaFile]) async {
+        for i in files.indices {
+            guard files[i].hasGPS,
+                  let lat = files[i].gpsLatitude,
+                  let lon = files[i].gpsLongitude else { continue }
+
+            if let info = await reverseGeocode(latitude: lat, longitude: lon) {
+                files[i].locationCity = info.city
+                files[i].locationCountry = info.country
+                files[i].locationState = info.state
+                files[i].locationLocality = info.locality
+            }
+        }
+    }
+
+    /// Number of cached locations.
+    var cacheCount: Int {
+        memoryCache.count
+    }
+
+    // MARK: - Private
+
+    private func cacheKey(latitude: Double, longitude: Double) -> String {
+        // Round to 3 decimal places (~110m precision)
+        let lat = (latitude * 1000).rounded() / 1000
+        let lon = (longitude * 1000).rounded() / 1000
+        return "\(lat),\(lon)"
+    }
+
+    private func saveCacheToDisk() {
+        guard let data = try? JSONEncoder().encode(memoryCache) else { return }
+        try? data.write(to: cacheURL)
+    }
+}
