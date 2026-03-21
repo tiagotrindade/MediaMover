@@ -18,7 +18,6 @@ struct ConfigPanel: View {
             ScrollView {
                 VStack(spacing: 18) {
                     destinationCard
-                    profileSection
                     folderStructureSection
                     fileHandlingSection
                     safetySection
@@ -95,32 +94,83 @@ struct ConfigPanel: View {
             }
     }
 
-    // MARK: - Profiles / Presets
-
-    private var profileSection: some View {
-        ProfilePickerView(viewModel: viewModel)
-    }
-
-    // MARK: - Folder Structure (Template Builder)
+    // MARK: - Folder Structure (Simple + Advanced)
 
     private var folderStructureSection: some View {
         VStack(alignment: .leading, spacing: 7) {
             sectionHeader("Folder Structure")
 
-            TemplateBuilderView(
-                template: $viewModel.folderTemplate,
-                validation: viewModel.templateValidation,
-                previewFiles: Array(viewModel.discoveredFiles.prefix(3))
-            )
-
             VStack(spacing: 0) {
+                // Simple mode: pattern picker
+                simpleFolderPicker
+
+                thinDivider
+
+                // Videos subfolder toggle
                 configRow(label: "Videos subfolder", icon: "video.fill") {
                     Toggle("", isOn: $viewModel.separateVideos).labelsHidden().toggleStyle(.checkbox)
                 }
+
+                thinDivider
+
+                // Advanced toggle row
+                HStack(spacing: 8) {
+                    Label("Advanced", systemImage: "slider.horizontal.3")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Toggle("", isOn: $viewModel.showAdvancedFolderOptions.animation(.easeInOut(duration: 0.2)))
+                        .labelsHidden().toggleStyle(.switch).controlSize(.mini)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 8)
             }
-            .padding(10)
             .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
+
+            // Advanced section (collapsible)
+            if viewModel.showAdvancedFolderOptions {
+                VStack(alignment: .leading, spacing: 10) {
+                    ProfilePickerView(viewModel: viewModel)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left.forwardslash.chevron.right")
+                                .font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
+                            Text("CUSTOM TEMPLATE")
+                                .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(0.5)
+                        }
+
+                        TemplateBuilderView(
+                            template: $viewModel.folderTemplate,
+                            validation: viewModel.templateValidation,
+                            previewFiles: Array(viewModel.discoveredFiles.prefix(3))
+                        )
+                    }
+                }
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
+    }
+
+    // Simple folder pattern picker
+    private var simpleFolderPicker: some View {
+        HStack(spacing: 8) {
+            Label("Pattern", systemImage: "folder")
+                .font(.system(size: 12)).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Picker("", selection: Binding(
+                get: { viewModel.folderTemplate },
+                set: { viewModel.folderTemplate = $0 }
+            )) {
+                ForEach(TemplateEngine.folderPresets, id: \.template) { preset in
+                    Text(preset.name).tag(preset.template)
+                }
+                if !TemplateEngine.folderPresets.contains(where: { $0.template == viewModel.folderTemplate }) {
+                    Divider()
+                    Text("Custom").tag(viewModel.folderTemplate)
+                }
+            }
+            .labelsHidden().frame(maxWidth: 180)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
     }
 
     // MARK: - File Handling

@@ -114,7 +114,7 @@ struct SourcePanel: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(Array(viewModel.discoveredFiles.prefix(500).enumerated()), id: \.element.id) { idx, file in
-                        SourceFileRow(file: file, index: idx)
+                        SourceFileRow(file: file, index: idx, showThumbnail: viewModel.showThumbnails)
                     }
                     if viewModel.discoveredFiles.count > 500 {
                         Text("+ \(viewModel.discoveredFiles.count - 500) more…")
@@ -128,25 +128,41 @@ struct SourcePanel: View {
     // MARK: - Footer
 
     private var panelFooter: some View {
-        HStack(spacing: 8) {
-            Toggle(isOn: $viewModel.includeSubfolders) {
-                HStack(spacing: 4) {
-                    Image(systemName: "folder.badge.questionmark").font(.system(size: 10))
-                    Text("Subfolders").font(.system(size: 11))
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Toggle(isOn: $viewModel.includeSubfolders) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.badge.questionmark").font(.system(size: 10))
+                        Text("Include Subfolders").font(.system(size: 11))
+                    }
                 }
-            }
-            .toggleStyle(.checkbox)
+                .toggleStyle(.checkbox)
 
-            Spacer()
+                Spacer()
 
-            Button("Scan") {
-                viewModel.startScan()
+                Toggle(isOn: $viewModel.showThumbnails) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "photo.on.rectangle").font(.system(size: 10))
+                        Text("Thumbnails").font(.system(size: 11))
+                    }
+                }
+                .toggleStyle(.checkbox)
             }
-            .buttonStyle(SecondaryButtonStyle())
-            .controlSize(.small)
-            .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isProcessing || viewModel.isUndoing)
+            .padding(.horizontal, 12).padding(.vertical, 8)
+
+            Divider().padding(.horizontal, 8)
+
+            HStack {
+                Spacer()
+                Button("Scan") {
+                    viewModel.startScan()
+                }
+                .buttonStyle(SecondaryButtonStyle())
+                .controlSize(.small)
+                .disabled(viewModel.sourceURL == nil || viewModel.isScanning || viewModel.isProcessing || viewModel.isUndoing)
+            }
+            .padding(.horizontal, 12).padding(.vertical, 8)
         }
-        .padding(.horizontal, 12).padding(.vertical, 10)
     }
 }
 
@@ -155,13 +171,19 @@ struct SourcePanel: View {
 struct SourceFileRow: View {
     let file: MediaFile
     let index: Int
+    var showThumbnail: Bool = true
     @State private var thumbnail: NSImage?
 
     var body: some View {
         HStack(spacing: 6) {
-            thumbnailView
-                .frame(width: 30, height: 30)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
+            if showThumbnail {
+                thumbnailView
+                    .frame(width: 30, height: 30)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+            } else {
+                fileIcon.font(.system(size: 12))
+                    .frame(width: 20, height: 20)
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(file.fileName)
                     .font(.system(size: 11, design: .monospaced))
@@ -183,6 +205,7 @@ struct SourceFileRow: View {
         .padding(.horizontal, 10).padding(.vertical, 3)
         .background(index % 2 == 0 ? Color.clear : Color(NSColor.controlBackgroundColor).opacity(0.4))
         .task(id: file.id) {
+            guard showThumbnail else { return }
             thumbnail = await ThumbnailService.shared.thumbnail(for: file.url)
         }
     }

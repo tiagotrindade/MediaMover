@@ -19,6 +19,10 @@ final class OrganizerViewModel {
     // Date fallback
     var dateFallback: DateFallback = .creationDate
 
+    // UI preferences
+    var showAdvancedFolderOptions: Bool = false
+    var showThumbnails: Bool = true
+
     // Video subfolder
     var separateVideos: Bool = true
 
