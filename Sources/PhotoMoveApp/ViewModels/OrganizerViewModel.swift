@@ -175,9 +175,14 @@ final class OrganizerViewModel {
             // Reverse geocode GPS coordinates if enabled
             let hasGPSFiles = files.contains(where: { $0.hasGPS })
             if geocodingEnabled && hasGPSFiles {
-                scanMessage = "Resolving locations..."
+                let gpsCount = files.filter(\.hasGPS).count
+                scanMessage = "Resolving locations (0/\(gpsCount))..."
                 geocodingMessage = "Resolving GPS locations..."
-                await GeocodingService.shared.resolveLocations(for: &files)
+                await GeocodingService.shared.resolveLocations(for: &files) { [weak self] resolved, total in
+                    await MainActor.run {
+                        self?.scanMessage = "Resolving locations (\(resolved)/\(total))..."
+                    }
+                }
                 geocodingMessage = ""
             }
 

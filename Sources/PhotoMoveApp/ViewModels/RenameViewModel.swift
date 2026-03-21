@@ -78,6 +78,7 @@ final class RenameViewModel {
         let originalName: String
         let newName: String
         let file: MediaFile
+        var matchRanges: [Range<String.Index>] = []
     }
 
     // MARK: - Folder Selection
@@ -241,8 +242,10 @@ final class RenameViewModel {
             let target = regexMatchStemOnly ? stem : file.fileName
             let range = NSRange(target.startIndex..., in: target)
 
-            let hasMatch = regex.firstMatch(in: target, range: range) != nil
-            if hasMatch { matchCount += 1 }
+            let matches = regex.matches(in: target, range: range)
+            if !matches.isEmpty { matchCount += 1 }
+
+            let ranges: [Range<String.Index>] = matches.compactMap { Range($0.range, in: target) }
 
             let replaced = regex.stringByReplacingMatches(in: target, range: range, withTemplate: regexReplace)
 
@@ -256,29 +259,13 @@ final class RenameViewModel {
             previews.append(RenamePreview(
                 originalName: file.fileName,
                 newName: newName.isEmpty ? file.fileName : newName,
-                file: file
+                file: file,
+                matchRanges: ranges
             ))
         }
 
         regexMatchCount = matchCount
         previewItems = previews
-    }
-
-    /// Get the regex match ranges for highlighting in the UI.
-    func regexMatchRanges(in fileName: String) -> [Range<String.Index>] {
-        guard !regexFind.isEmpty else { return [] }
-        var options: NSRegularExpression.Options = []
-        if regexCaseInsensitive { options.insert(.caseInsensitive) }
-        guard let regex = try? NSRegularExpression(pattern: regexFind, options: options) else { return [] }
-
-        let stem = (fileName as NSString).deletingPathExtension
-        let target = regexMatchStemOnly ? stem : fileName
-        let nsRange = NSRange(target.startIndex..., in: target)
-        let matches = regex.matches(in: target, range: nsRange)
-
-        return matches.compactMap { match in
-            Range(match.range, in: target)
-        }
     }
 
     /// Limited rename for non-media files: only date prefix + original name, using file dates

@@ -86,10 +86,12 @@ actor GeocodingService {
             result = nil
         }
 
-        // Cache result (even nil → store empty info to avoid re-requesting)
-        let info = result ?? LocationInfo(city: nil, country: nil, state: nil, locality: nil)
-        memoryCache[key] = info
-        saveCacheToDisk()
+        // Only cache successful results — failed lookups (network errors, rate limits)
+        // should be retried on next scan
+        if let result {
+            memoryCache[key] = result
+            saveCacheToDisk()
+        }
 
         // Resume pending continuations
         let pending = pendingRequests.removeValue(forKey: key) ?? []
@@ -101,10 +103,18 @@ actor GeocodingService {
     }
 
     /// Batch resolve locations for multiple files. Modifies files in-place.
-    func resolveLocations(for files: inout [MediaFile]) async {
-        for i in files.indices {
-            guard files[i].hasGPS,
-                  let lat = files[i].gpsLatitude,
+    /// Reports progress via optional callback.
+    func resolveLocations(
+        for files: inout [MediaFile],
+        progressCallback: (@Sendable (Int, Int) async -> Void)? = nil
+    ) async {
+        let gpsIndices = files.indices.filter { files[$0].hasGPS }
+        let total = gpsIndices.count
+        var resolved = 0
+
+        for i in gpsIndices {
+            if Task.isCancelled { return }
+            guard let lat = files[i].gpsLatitude,
                   let lon = files[i].gpsLongitude else { continue }
 
             if let info = await reverseGeocode(latitude: lat, longitude: lon) {
@@ -113,12 +123,20 @@ actor GeocodingService {
                 files[i].locationState = info.state
                 files[i].locationLocality = info.locality
             }
+            resolved += 1
+            await progressCallback?(resolved, total)
         }
     }
 
     /// Number of cached locations.
     var cacheCount: Int {
         memoryCache.count
+    }
+
+    /// Clear the geocoding cache (memory + disk).
+    func clearCache() {
+        memoryCache.removeAll()
+        try? FileManager.default.removeItem(at: cacheURL)
     }
 
     // MARK: - Private

@@ -402,12 +402,24 @@ struct TemplateEngine: Sendable {
 
     // MARK: - Helpers
 
+    private static let fullMonthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")!
+        f.dateFormat = "MMMM"
+        return f
+    }()
+
+    private static let shortMonthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(identifier: "UTC")!
+        f.dateFormat = "MMM"
+        return f
+    }()
+
     private static func monthName(from date: Date, abbreviated: Bool) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(identifier: "UTC")!
-        formatter.dateFormat = abbreviated ? "MMM" : "MMMM"
-        return formatter.string(from: date)
+        (abbreviated ? shortMonthFormatter : fullMonthFormatter).string(from: date)
     }
 
     /// Sanitize a string for use in folder/file names.

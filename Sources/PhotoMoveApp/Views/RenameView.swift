@@ -131,7 +131,7 @@ struct RenameSourcePanel: View {
                 Toggle(isOn: $viewModel.includeSubfolders) {
                     HStack(spacing: 4) {
                         Image(systemName: "folder.badge.questionmark").font(.system(size: 10))
-                        Text("Subfolders").font(.system(size: 11))
+                        Text("Include Subfolders").font(.system(size: 11))
                     }
                 }
                 .toggleStyle(.checkbox)
@@ -403,7 +403,7 @@ struct RenamePreviewPanel: View {
                                 RegexPreviewRow(
                                     item: item,
                                     index: idx,
-                                    matchRanges: viewModel.regexMatchRanges(in: item.originalName)
+                                    matchRanges: item.matchRanges
                                 )
                             } else {
                                 RenamePreviewRow2(item: item, index: idx)
