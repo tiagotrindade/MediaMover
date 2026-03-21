@@ -56,8 +56,8 @@ struct MoverView: View {
             viewModel.safeDismissDuplicate()
         }) {
             DuplicateResolverSheet(viewModel: viewModel)
+                .interactiveDismissDisabled()
         }
-        .interactiveDismissDisabled(viewModel.showDuplicateDialog)
         .sheet(item: $viewModel.result) { result in
             ResultsView(result: result, onDismiss: { viewModel.result = nil })
                 .frame(minWidth: 500, minHeight: 400)

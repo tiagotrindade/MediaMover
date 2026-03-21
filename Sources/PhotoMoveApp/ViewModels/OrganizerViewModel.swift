@@ -25,8 +25,6 @@ final class OrganizerViewModel {
     // Rename with date prefix
     var renameWithDate: Bool = false
 
-    // Camera subfolder
-    var separateByCamera: Bool = false
 
     // Duplicate handling
     var duplicateStrategy: DuplicateStrategy = .ask
@@ -202,7 +200,7 @@ final class OrganizerViewModel {
             let date = file.effectiveDate(fallback: dateFallback)
             var subpath: String
 
-            if date != nil || folderTemplate.isEmpty == false {
+            if date != nil {
                 // Use template engine for folder path
                 let context = file.templateContext(fallback: dateFallback, sequenceNumber: index + 1)
                 subpath = TemplateEngine.evaluate(tokens: tokens, context: context)
@@ -270,7 +268,7 @@ final class OrganizerViewModel {
             dateFallback: dateFallback,
             separateVideos: separateVideos,
             renameWithDate: renameWithDate,
-            separateByCamera: separateByCamera,
+            separateByCamera: false,
             folderTemplate: folderTemplate
         )
 

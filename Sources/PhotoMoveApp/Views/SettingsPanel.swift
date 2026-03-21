@@ -74,11 +74,6 @@ struct SettingsPanel: View {
 
                 Divider().frame(height: 16)
 
-                Toggle("Camera subfolder", isOn: $viewModel.separateByCamera)
-                    .help("Create a subfolder with the camera model name (when available)")
-
-                Divider().frame(height: 16)
-
                 Toggle("Rename with date", isOn: $viewModel.renameWithDate)
                     .help("Prepend date to filename: 20260312_143522123_originalname.jpg")
 

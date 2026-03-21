@@ -13,7 +13,6 @@ struct OrganizerProfile: Identifiable, Codable, Sendable, Equatable {
 
     // Operation settings
     var operationMode: String   // "Copy" or "Move"
-    var separateByCamera: Bool
     var separateVideos: Bool
     var renameWithDate: Bool
 
@@ -32,9 +31,79 @@ struct OrganizerProfile: Identifiable, Codable, Sendable, Equatable {
 
     // Metadata
     var dateFallback: String      // "File Creation Date", "File Modification Date", "Skip (no fallback)"
+    var geocodingEnabled: Bool
 
     static func == (lhs: OrganizerProfile, rhs: OrganizerProfile) -> Bool {
         lhs.id == rhs.id
+    }
+
+    // Provide default for geocodingEnabled so old JSON files decode without error
+    enum CodingKeys: String, CodingKey {
+        case id, name, isBuiltIn, folderTemplate, renameTemplate
+        case operationMode, separateVideos, renameWithDate
+        case includePhotos, includeVideos, includeOtherFiles
+        case duplicateStrategy, duplicateAction
+        case verifyIntegrity, hashAlgorithm
+        case dateFallback, geocodingEnabled
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        isBuiltIn = try c.decode(Bool.self, forKey: .isBuiltIn)
+        folderTemplate = try c.decode(String.self, forKey: .folderTemplate)
+        renameTemplate = try c.decodeIfPresent(String.self, forKey: .renameTemplate)
+        operationMode = try c.decode(String.self, forKey: .operationMode)
+        separateVideos = try c.decode(Bool.self, forKey: .separateVideos)
+        renameWithDate = try c.decode(Bool.self, forKey: .renameWithDate)
+        includePhotos = try c.decode(Bool.self, forKey: .includePhotos)
+        includeVideos = try c.decode(Bool.self, forKey: .includeVideos)
+        includeOtherFiles = try c.decode(Bool.self, forKey: .includeOtherFiles)
+        duplicateStrategy = try c.decode(String.self, forKey: .duplicateStrategy)
+        duplicateAction = try c.decode(String.self, forKey: .duplicateAction)
+        verifyIntegrity = try c.decode(Bool.self, forKey: .verifyIntegrity)
+        hashAlgorithm = try c.decode(String.self, forKey: .hashAlgorithm)
+        dateFallback = try c.decode(String.self, forKey: .dateFallback)
+        geocodingEnabled = try c.decodeIfPresent(Bool.self, forKey: .geocodingEnabled) ?? true
+    }
+
+    init(
+        id: UUID,
+        name: String,
+        isBuiltIn: Bool,
+        folderTemplate: String,
+        renameTemplate: String?,
+        operationMode: String,
+        separateVideos: Bool,
+        renameWithDate: Bool,
+        includePhotos: Bool,
+        includeVideos: Bool,
+        includeOtherFiles: Bool,
+        duplicateStrategy: String,
+        duplicateAction: String,
+        verifyIntegrity: Bool,
+        hashAlgorithm: String,
+        dateFallback: String,
+        geocodingEnabled: Bool = true
+    ) {
+        self.id = id
+        self.name = name
+        self.isBuiltIn = isBuiltIn
+        self.folderTemplate = folderTemplate
+        self.renameTemplate = renameTemplate
+        self.operationMode = operationMode
+        self.separateVideos = separateVideos
+        self.renameWithDate = renameWithDate
+        self.includePhotos = includePhotos
+        self.includeVideos = includeVideos
+        self.includeOtherFiles = includeOtherFiles
+        self.duplicateStrategy = duplicateStrategy
+        self.duplicateAction = duplicateAction
+        self.verifyIntegrity = verifyIntegrity
+        self.hashAlgorithm = hashAlgorithm
+        self.dateFallback = dateFallback
+        self.geocodingEnabled = geocodingEnabled
     }
 }
 
@@ -74,7 +143,6 @@ final class ProfileManager {
             folderTemplate: "{YYYY}/{MM}/{DD}",
             renameTemplate: nil,
             operationMode: "Copy",
-            separateByCamera: false,
             separateVideos: true,
             renameWithDate: false,
             includePhotos: true,
@@ -84,7 +152,8 @@ final class ProfileManager {
             duplicateAction: "Rename File",
             verifyIntegrity: true,
             hashAlgorithm: "XXHash64",
-            dateFallback: "File Creation Date"
+            dateFallback: "File Creation Date",
+            geocodingEnabled: true
         ),
         OrganizerProfile(
             id: UUID(uuidString: "00000000-0001-0000-0000-000000000002")!,
@@ -93,7 +162,6 @@ final class ProfileManager {
             folderTemplate: "{YYYY}/{MM}/{Camera}",
             renameTemplate: nil,
             operationMode: "Copy",
-            separateByCamera: false,
             separateVideos: true,
             renameWithDate: false,
             includePhotos: true,
@@ -103,7 +171,8 @@ final class ProfileManager {
             duplicateAction: "Rename File",
             verifyIntegrity: true,
             hashAlgorithm: "XXHash64",
-            dateFallback: "File Creation Date"
+            dateFallback: "File Creation Date",
+            geocodingEnabled: true
         ),
         OrganizerProfile(
             id: UUID(uuidString: "00000000-0001-0000-0000-000000000003")!,
@@ -112,7 +181,6 @@ final class ProfileManager {
             folderTemplate: "{YYYY}/{MM}/{DD}/Videos",
             renameTemplate: nil,
             operationMode: "Copy",
-            separateByCamera: false,
             separateVideos: false,
             renameWithDate: true,
             includePhotos: true,
@@ -122,7 +190,8 @@ final class ProfileManager {
             duplicateAction: "Rename File",
             verifyIntegrity: true,
             hashAlgorithm: "XXHash64",
-            dateFallback: "File Creation Date"
+            dateFallback: "File Creation Date",
+            geocodingEnabled: true
         ),
         OrganizerProfile(
             id: UUID(uuidString: "00000000-0001-0000-0000-000000000004")!,
@@ -131,7 +200,6 @@ final class ProfileManager {
             folderTemplate: "{YYYY}_{MM}_{DD}_{Original}",
             renameTemplate: nil,
             operationMode: "Copy",
-            separateByCamera: false,
             separateVideos: false,
             renameWithDate: false,
             includePhotos: true,
@@ -141,7 +209,8 @@ final class ProfileManager {
             duplicateAction: "Rename File",
             verifyIntegrity: true,
             hashAlgorithm: "SHA-256",
-            dateFallback: "File Creation Date"
+            dateFallback: "File Creation Date",
+            geocodingEnabled: true
         ),
     ]
 
@@ -207,7 +276,6 @@ final class ProfileManager {
     func applyProfile(_ profile: OrganizerProfile, to vm: OrganizerViewModel) {
         vm.folderTemplate = profile.folderTemplate
         vm.operationMode = OperationMode(rawValue: profile.operationMode) ?? .copy
-        vm.separateByCamera = profile.separateByCamera
         vm.separateVideos = profile.separateVideos
         vm.renameWithDate = profile.renameWithDate
         vm.includePhotos = profile.includePhotos
@@ -218,6 +286,7 @@ final class ProfileManager {
         vm.verifyIntegrity = profile.verifyIntegrity
         vm.hashAlgorithm = HashAlgorithm(rawValue: profile.hashAlgorithm) ?? .xxhash64
         vm.dateFallback = DateFallback(rawValue: profile.dateFallback) ?? .creationDate
+        vm.geocodingEnabled = profile.geocodingEnabled
         selectedProfileId = profile.id
     }
 
@@ -230,7 +299,6 @@ final class ProfileManager {
             folderTemplate: vm.folderTemplate,
             renameTemplate: nil,
             operationMode: vm.operationMode.rawValue,
-            separateByCamera: vm.separateByCamera,
             separateVideos: vm.separateVideos,
             renameWithDate: vm.renameWithDate,
             includePhotos: vm.includePhotos,
@@ -240,7 +308,8 @@ final class ProfileManager {
             duplicateAction: vm.duplicateAction.rawValue,
             verifyIntegrity: vm.verifyIntegrity,
             hashAlgorithm: vm.hashAlgorithm.rawValue,
-            dateFallback: vm.dateFallback.rawValue
+            dateFallback: vm.dateFallback.rawValue,
+            geocodingEnabled: vm.geocodingEnabled
         )
     }
 

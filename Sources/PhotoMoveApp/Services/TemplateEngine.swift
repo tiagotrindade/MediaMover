@@ -249,7 +249,8 @@ struct TemplateEngine: Sendable {
     /// Evaluate a parsed token list with the given context.
     /// Returns the resulting string (may be a path with `/` separators).
     static func evaluate(tokens: [TemplateToken], context: TemplateContext) -> String {
-        let cal = Calendar(identifier: .gregorian)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
         let unknownFallback = "Unknown"
 
         return tokens.map { token -> String in
@@ -404,6 +405,7 @@ struct TemplateEngine: Sendable {
     private static func monthName(from date: Date, abbreviated: Bool) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "UTC")!
         formatter.dateFormat = abbreviated ? "MMM" : "MMMM"
         return formatter.string(from: date)
     }

@@ -30,7 +30,6 @@ struct ConfigPanel: View {
         .background(Color(NSColor.windowBackgroundColor))
         .onChange(of: viewModel.renameWithDate)    { viewModel.generatePreview() }
         .onChange(of: viewModel.folderTemplate)    { viewModel.generatePreview() }
-        .onChange(of: viewModel.separateByCamera)  { viewModel.generatePreview() }
         .onChange(of: viewModel.separateVideos)    { viewModel.generatePreview() }
         .onChange(of: viewModel.dateFallback)      { viewModel.generatePreview() }
     }

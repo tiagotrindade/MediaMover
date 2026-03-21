@@ -51,7 +51,6 @@ final class RenameViewModel {
         ("Replace spaces with _",   "\\s+",                   "_"),
         ("Extract date digits",     "(\\d{4})(\\d{2})(\\d{2})", "$1-$2-$3"),
         ("Remove trailing numbers", "_\\d+$",                 ""),
-        ("Lowercase all",           "([A-Z])",                "$1"),  // placeholder — handled specially
     ]
 
     // MARK: - State
@@ -287,7 +286,8 @@ final class RenameViewModel {
         guard let date = file.effectiveDate(fallback: dateFallback) else {
             return file.fileName // no date available, keep original
         }
-        let cal = Calendar.current
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
         let y = cal.component(.year, from: date)
         let mo = cal.component(.month, from: date)
         let d = cal.component(.day, from: date)
