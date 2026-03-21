@@ -178,7 +178,7 @@ struct SourceFileRow: View {
         HStack(spacing: 6) {
             if showThumbnail {
                 thumbnailView
-                    .frame(width: 30, height: 30)
+                    .frame(width: 34, height: 34)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
             } else {
                 fileIcon.font(.system(size: 12))
