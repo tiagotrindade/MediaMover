@@ -7,16 +7,20 @@ struct ProfilePickerView: View {
     @State private var profileManager = ProfileManager.shared
     @State private var showSaveSheet = false
     @State private var showDeleteConfirm = false
+    @State private var showUpgrade = false
     @State private var newProfileName = ""
     @State private var profileToDelete: OrganizerProfile?
 
     var body: some View {
+        let isPro = ProManager.shared.isPro
+
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 5) {
                 Image(systemName: "tray.2")
                     .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
                 Text("PRESETS")
                     .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(0.5)
+                ProInlineBadge(gate: .profiles)
                 Spacer()
             }
 
@@ -44,19 +48,34 @@ struct ProfilePickerView: View {
                 .labelsHidden()
                 .frame(maxWidth: .infinity)
 
-                // Save as button
-                Button {
-                    newProfileName = ""
-                    showSaveSheet = true
-                } label: {
-                    Image(systemName: "square.and.arrow.down")
-                        .font(.system(size: 11))
+                // Save as button — Pro only
+                if isPro {
+                    Button {
+                        newProfileName = ""
+                        showSaveSheet = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.down")
+                            .font(.system(size: 11))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Save current settings as preset")
+                } else {
+                    Button {
+                        showUpgrade = true
+                    } label: {
+                        HStack(spacing: 2) {
+                            Image(systemName: "square.and.arrow.down")
+                                .font(.system(size: 11)).foregroundStyle(.tertiary)
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 7)).foregroundStyle(.tertiary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help("Pro: Save custom presets")
                 }
-                .buttonStyle(.plain)
-                .help("Save current settings as preset")
 
-                // Delete button (only for user presets)
-                if let selected = profileManager.selectedProfile, !selected.isBuiltIn {
+                // Delete button (only for user presets, Pro only)
+                if isPro, let selected = profileManager.selectedProfile, !selected.isBuiltIn {
                     Button {
                         profileToDelete = selected
                         showDeleteConfirm = true
@@ -68,17 +87,32 @@ struct ProfilePickerView: View {
                     .help("Delete this preset")
                 }
 
-                // Duplicate button (for built-in presets)
+                // Duplicate button (for built-in presets, Pro only)
                 if let selected = profileManager.selectedProfile, selected.isBuiltIn {
-                    Button {
-                        let copy = profileManager.duplicateProfile(selected)
-                        profileManager.selectedProfileId = copy.id
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 11))
+                    if isPro {
+                        Button {
+                            let copy = profileManager.duplicateProfile(selected)
+                            profileManager.selectedProfileId = copy.id
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Duplicate & customize this preset")
+                    } else {
+                        Button {
+                            showUpgrade = true
+                        } label: {
+                            HStack(spacing: 2) {
+                                Image(systemName: "doc.on.doc")
+                                    .font(.system(size: 11)).foregroundStyle(.tertiary)
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 7)).foregroundStyle(.tertiary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .help("Pro: Duplicate & customize presets")
                     }
-                    .buttonStyle(.plain)
-                    .help("Duplicate & customize this preset")
                 }
             }
             .padding(8)
@@ -109,6 +143,9 @@ struct ProfilePickerView: View {
             if let profile = profileToDelete {
                 Text("Are you sure you want to delete \"\(profile.name)\"?")
             }
+        }
+        .sheet(isPresented: $showUpgrade) {
+            UpgradeView()
         }
     }
 }

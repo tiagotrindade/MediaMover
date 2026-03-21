@@ -108,8 +108,10 @@ struct ConfigPanel: View {
                 thinDivider
 
                 // Videos subfolder toggle
-                configRow(label: "Videos subfolder", icon: "video.fill") {
-                    Toggle("", isOn: $viewModel.separateVideos).labelsHidden().toggleStyle(.checkbox)
+                ProLockedRow(gate: .videoSubfolder) {
+                    configRow(label: "Videos subfolder", icon: "video.fill") {
+                        Toggle("", isOn: $viewModel.separateVideos).labelsHidden().toggleStyle(.checkbox)
+                    }
                 }
 
                 thinDivider
@@ -137,13 +139,16 @@ struct ConfigPanel: View {
                                 .font(.system(size: 9, weight: .semibold)).foregroundStyle(.secondary)
                             Text("CUSTOM TEMPLATE")
                                 .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(0.5)
+                            ProInlineBadge(gate: .customTemplates)
                         }
 
-                        TemplateBuilderView(
-                            template: $viewModel.folderTemplate,
-                            validation: viewModel.templateValidation,
-                            previewFiles: Array(viewModel.discoveredFiles.prefix(3))
-                        )
+                        ProBadge(gate: .customTemplates) {
+                            TemplateBuilderView(
+                                template: $viewModel.folderTemplate,
+                                validation: viewModel.templateValidation,
+                                previewFiles: Array(viewModel.discoveredFiles.prefix(3))
+                            )
+                        }
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
@@ -151,7 +156,7 @@ struct ConfigPanel: View {
         }
     }
 
-    // Simple folder pattern picker
+    // Simple folder pattern picker — shows only 3 presets when Free
     private var simpleFolderPicker: some View {
         HStack(spacing: 8) {
             Label("Pattern", systemImage: "folder")
@@ -161,8 +166,17 @@ struct ConfigPanel: View {
                 get: { viewModel.folderTemplate },
                 set: { viewModel.folderTemplate = $0 }
             )) {
-                ForEach(TemplateEngine.folderPresets, id: \.template) { preset in
-                    Text(preset.name).tag(preset.template)
+                let isPro = ProManager.shared.isPro
+                ForEach(Array(TemplateEngine.folderPresets.enumerated()), id: \.element.template) { index, preset in
+                    let isLocked = !isPro && index >= FeatureGate.freeFolderPresetCount
+                    HStack {
+                        Text(preset.name)
+                        if isLocked {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 8))
+                        }
+                    }
+                    .tag(preset.template)
                 }
                 if !TemplateEngine.folderPresets.contains(where: { $0.template == viewModel.folderTemplate }) {
                     Divider()
@@ -170,6 +184,16 @@ struct ConfigPanel: View {
                 }
             }
             .labelsHidden().frame(maxWidth: 180)
+            .onChange(of: viewModel.folderTemplate) {
+                // If Free user selected a Pro preset, reset
+                let isPro = ProManager.shared.isPro
+                if !isPro {
+                    if !OrganizerViewModel.freeFolderTemplates.contains(viewModel.folderTemplate) {
+                        viewModel.folderTemplate = "{YYYY}/{MM}/{DD}"
+                        viewModel.showUpgradeSheet = true
+                    }
+                }
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 8)
     }
@@ -193,14 +217,18 @@ struct ConfigPanel: View {
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 thinDivider
-                configRow(label: "Rename with date", icon: "textformat") {
-                    Toggle("", isOn: $viewModel.renameWithDate).labelsHidden().toggleStyle(.checkbox)
+                ProLockedRow(gate: .renameWithDate) {
+                    configRow(label: "Rename with date", icon: "textformat") {
+                        Toggle("", isOn: $viewModel.renameWithDate).labelsHidden().toggleStyle(.checkbox)
+                    }
                 }
                 thinDivider
                 HStack(spacing: 12) {
                     TypeToggle(label: "Photos", icon: "photo", color: .blue, isOn: $viewModel.includePhotos)
                     TypeToggle(label: "Videos", icon: "video", color: .green, isOn: $viewModel.includeVideos)
-                    TypeToggle(label: "Other", icon: "doc", color: .gray, isOn: $viewModel.includeOtherFiles)
+                    ProLockedRow(gate: .otherFiles) {
+                        TypeToggle(label: "Other", icon: "doc", color: .gray, isOn: $viewModel.includeOtherFiles)
+                    }
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
             }
@@ -221,21 +249,50 @@ struct ConfigPanel: View {
                     thinDivider
                     configRow(label: "Algorithm", icon: "cpu") {
                         Picker("", selection: $viewModel.hashAlgorithm) {
-                            ForEach(HashAlgorithm.allCases, id: \.self) { a in
-                                Text(a.rawValue).tag(a)
+                            Text(HashAlgorithm.xxhash64.rawValue).tag(HashAlgorithm.xxhash64)
+                            HStack {
+                                Text(HashAlgorithm.sha256.rawValue)
+                                if !ProManager.shared.isPro {
+                                    Image(systemName: "lock.fill").font(.system(size: 8))
+                                }
                             }
+                            .tag(HashAlgorithm.sha256)
                         }
                         .labelsHidden().frame(maxWidth: 180)
+                        .onChange(of: viewModel.hashAlgorithm) {
+                            if !ProManager.shared.isPro && viewModel.hashAlgorithm == .sha256 {
+                                viewModel.hashAlgorithm = .xxhash64
+                                viewModel.showUpgradeSheet = true
+                            }
+                        }
                     }
                 }
                 thinDivider
                 configRow(label: "Duplicates", icon: "doc.on.doc") {
                     Picker("", selection: $viewModel.duplicateStrategy) {
-                        ForEach(DuplicateStrategy.allCases, id: \.self) { s in
-                            Text(s.rawValue).tag(s)
+                        Text(DuplicateStrategy.skip.rawValue).tag(DuplicateStrategy.skip)
+                        HStack {
+                            Text(DuplicateStrategy.ask.rawValue)
+                            if !ProManager.shared.isPro {
+                                Image(systemName: "lock.fill").font(.system(size: 8))
+                            }
                         }
+                        .tag(DuplicateStrategy.ask)
+                        HStack {
+                            Text(DuplicateStrategy.automatic.rawValue)
+                            if !ProManager.shared.isPro {
+                                Image(systemName: "lock.fill").font(.system(size: 8))
+                            }
+                        }
+                        .tag(DuplicateStrategy.automatic)
                     }
                     .labelsHidden().frame(maxWidth: 180)
+                    .onChange(of: viewModel.duplicateStrategy) {
+                        if !ProManager.shared.isPro && viewModel.duplicateStrategy != .skip {
+                            viewModel.duplicateStrategy = .skip
+                            viewModel.showUpgradeSheet = true
+                        }
+                    }
                 }
                 if viewModel.duplicateStrategy == .automatic {
                     thinDivider
@@ -266,6 +323,12 @@ struct ConfigPanel: View {
                         }
                     }
                     .labelsHidden().frame(maxWidth: 180)
+                }
+                thinDivider
+                ProLockedRow(gate: .reverseGeocoding) {
+                    configRow(label: "Reverse Geocoding", icon: "location") {
+                        Toggle("", isOn: $viewModel.geocodingEnabled).labelsHidden().toggleStyle(.checkbox)
+                    }
                 }
             }
             .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))

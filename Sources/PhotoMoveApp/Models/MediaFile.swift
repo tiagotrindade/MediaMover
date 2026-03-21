@@ -39,6 +39,9 @@ struct MediaFile: Identifiable, Sendable {
     var locationState: String?
     var locationLocality: String?
 
+    /// Whether this file requires Pro to process (RAW formats in Free tier).
+    var requiresPro: Bool = false
+
     /// Returns the best available date given the user's fallback preference.
     func effectiveDate(fallback: DateFallback = .creationDate) -> Date? {
         if let dateTaken { return dateTaken }

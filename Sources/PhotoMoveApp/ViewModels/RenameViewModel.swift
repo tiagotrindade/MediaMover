@@ -73,6 +73,11 @@ final class RenameViewModel {
     private var operationStartTime: Date?
     private var currentTask: Task<Void, Never>?
 
+    // Pro gate alerts
+    var showFileLimitAlert: Bool = false
+    var fileLimitAlertCount: Int = 0
+    var showUpgradeSheet: Bool = false
+
     struct RenamePreview: Identifiable {
         let id = UUID()
         let originalName: String
@@ -168,6 +173,16 @@ final class RenameViewModel {
     // MARK: - Regenerate Preview (pattern change only, no rescan)
 
     func regeneratePreview() {
+        // Enforce Free rename patterns if not Pro
+        if !ProManager.shared.isPro {
+            if !Self.freeRenamePatterns.contains(pattern) {
+                pattern = .dateOriginalName
+            }
+            if useRegexMode {
+                useRegexMode = false
+            }
+        }
+
         if useRegexMode {
             regenerateRegexPreview()
         } else {
@@ -291,12 +306,53 @@ final class RenameViewModel {
 
     // MARK: - Execute Rename
 
+    /// Free rename presets (first 3).
+    static let freeRenamePatterns: Set<RenamePattern> = [
+        .dateOriginal, .dateOriginalName, .dateOnly
+    ]
+
     func beginRename() {
+        let isPro = ProManager.shared.isPro
+
+        // Block regex mode in Free
+        if !isPro && useRegexMode {
+            showUpgradeSheet = true
+            return
+        }
+
+        // Filter out Pro-only files in Free mode
+        var itemsToRename = previewItems
+        if !isPro {
+            itemsToRename = itemsToRename.filter { !$0.file.requiresPro }
+        }
+
+        // Check file limit in Free mode
+        if !isPro && itemsToRename.count > FeatureGate.freeFileLimit {
+            fileLimitAlertCount = itemsToRename.count
+            showFileLimitAlert = true
+            return
+        }
+
         currentTask = Task { await executeRename() }
     }
 
-    func executeRename() async {
+    /// Called when user chooses "Continue with first 100" from the file limit alert.
+    func beginRenameWithLimit() {
+        currentTask = Task { await executeRename(applyFreeLimit: true) }
+    }
+
+    func executeRename(applyFreeLimit: Bool = false) async {
         guard !previewItems.isEmpty else { return }
+
+        let isPro = ProManager.shared.isPro
+        var itemsToProcess = previewItems
+        if !isPro {
+            itemsToProcess = itemsToProcess.filter { !$0.file.requiresPro }
+            if applyFreeLimit && itemsToProcess.count > FeatureGate.freeFileLimit {
+                itemsToProcess = Array(itemsToProcess.prefix(FeatureGate.freeFileLimit))
+            }
+        }
+
         isRenaming = true
         progress = 0
         renamedCount = 0
@@ -306,7 +362,7 @@ final class RenameViewModel {
         estimatedTimeRemaining = 0
 
         let fm = FileManager.default
-        let total = previewItems.count
+        let total = itemsToProcess.count
         let logger = ActivityLogger.shared
         let isCopy = renameMode == .copyToFolder
 
@@ -315,7 +371,7 @@ final class RenameViewModel {
             try? fm.createDirectory(at: dest, withIntermediateDirectories: true)
         }
 
-        for (index, item) in previewItems.enumerated() {
+        for (index, item) in itemsToProcess.enumerated() {
             if Task.isCancelled { break }
             currentFileIndex = index + 1
             totalFiles = total

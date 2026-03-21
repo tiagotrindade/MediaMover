@@ -200,10 +200,18 @@ struct SourceFileRow: View {
                 }
             }
             Spacer()
+            if file.requiresPro && !ProManager.shared.isPro {
+                Text("PRO")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.orange)
+                    .padding(.horizontal, 4).padding(.vertical, 1)
+                    .background(RoundedRectangle(cornerRadius: 3).fill(Color.orange.opacity(0.12)))
+            }
             Text(ByteCountFormatter.string(fromByteCount: file.fileSize, countStyle: .file))
                 .font(.system(size: 10)).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 10).padding(.vertical, 3)
+        .opacity(file.requiresPro && !ProManager.shared.isPro ? 0.6 : 1.0)
         .background(index % 2 == 0 ? Color.clear : Color(NSColor.controlBackgroundColor).opacity(0.4))
         .task(id: file.id) {
             guard showThumbnail else { return }

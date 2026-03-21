@@ -44,19 +44,31 @@ actor OperationHistory {
         historyURL = url
 
         // Load from disk inline (nonisolated init context)
-        if let data = try? Data(contentsOf: url),
-           let decoded = try? JSONDecoder().decode([BatchOperation].self, from: data) {
-            batches = decoded
+        // Only load persistent history if Pro is enabled
+        let isPro = UserDefaults.standard.bool(forKey: "FolioSort_ProUnlocked")
+        if isPro {
+            if let data = try? Data(contentsOf: url),
+               let decoded = try? JSONDecoder().decode([BatchOperation].self, from: data) {
+                batches = decoded
+            }
         }
+        // Free mode: start with empty history (no persistence between sessions)
     }
 
     func addBatch(_ batch: BatchOperation) {
-        batches.append(batch)
-        // Keep last 50 batches
-        if batches.count > 50 {
-            batches = Array(batches.suffix(50))
+        let isPro = UserDefaults.standard.bool(forKey: "FolioSort_ProUnlocked")
+
+        if isPro {
+            batches.append(batch)
+            // Keep last 50 batches
+            if batches.count > 50 {
+                batches = Array(batches.suffix(50))
+            }
+            saveToDisk()
+        } else {
+            // Free: only keep the last operation, don't persist
+            batches = [batch]
         }
-        saveToDisk()
     }
 
     func getLastBatch() -> BatchOperation? {

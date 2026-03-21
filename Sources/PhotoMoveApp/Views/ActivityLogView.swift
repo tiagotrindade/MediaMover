@@ -6,6 +6,7 @@ struct ActivityView: View {
     @State private var filterText: String = ""
     @State private var filterStatus: LogStatus? = nil
     @State private var showNoLogAlert: Bool = false
+    @State private var showUpgrade: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -25,28 +26,65 @@ struct ActivityView: View {
         } message: {
             Text("No activity has been logged yet. Organize or rename files first.")
         }
+        .sheet(isPresented: $showUpgrade) {
+            UpgradeView()
+        }
     }
 
     // MARK: - Toolbar
 
     private var toolbarArea: some View {
-        HStack(spacing: 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.system(size: 12))
-                TextField("Search activity…", text: $filterText)
-                    .textFieldStyle(.plain).font(.system(size: 12))
-            }
-            .padding(.horizontal, 8).padding(.vertical, 5)
-            .background(RoundedRectangle(cornerRadius: 7).fill(Color(NSColor.controlBackgroundColor)))
-            .frame(maxWidth: 220)
+        let isPro = ProManager.shared.isPro
 
-            Picker("", selection: $filterStatus) {
-                Text("All").tag(nil as LogStatus?)
-                Text("Success").tag(LogStatus.success as LogStatus?)
-                Text("Warnings").tag(LogStatus.warning as LogStatus?)
-                Text("Errors").tag(LogStatus.error as LogStatus?)
+        return HStack(spacing: 10) {
+            // Search — Pro only
+            if isPro {
+                HStack(spacing: 6) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.system(size: 12))
+                    TextField("Search activity…", text: $filterText)
+                        .textFieldStyle(.plain).font(.system(size: 12))
+                }
+                .padding(.horizontal, 8).padding(.vertical, 5)
+                .background(RoundedRectangle(cornerRadius: 7).fill(Color(NSColor.controlBackgroundColor)))
+                .frame(maxWidth: 220)
+            } else {
+                Button {
+                    showUpgrade = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.system(size: 12))
+                        Text("Search activity…")
+                            .foregroundStyle(.tertiary).font(.system(size: 12))
+                        Image(systemName: "lock.fill").font(.system(size: 8)).foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Color(NSColor.controlBackgroundColor)))
+                    .frame(maxWidth: 220)
+                }
+                .buttonStyle(.plain)
             }
-            .labelsHidden().frame(width: 100)
+
+            // Filter — Pro only
+            if isPro {
+                Picker("", selection: $filterStatus) {
+                    Text("All").tag(nil as LogStatus?)
+                    Text("Success").tag(LogStatus.success as LogStatus?)
+                    Text("Warnings").tag(LogStatus.warning as LogStatus?)
+                    Text("Errors").tag(LogStatus.error as LogStatus?)
+                }
+                .labelsHidden().frame(width: 100)
+            } else {
+                Button {
+                    showUpgrade = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("Filter")
+                            .font(.system(size: 12)).foregroundStyle(.tertiary)
+                        Image(systemName: "lock.fill").font(.system(size: 8)).foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
 
             Spacer()
 
@@ -56,20 +94,33 @@ struct ActivityView: View {
             Button("Clear") { Task { await organizerVM.clearLog() } }
                 .buttonStyle(SecondaryButtonStyle()).controlSize(.small)
 
-            Button {
-                Task {
-                    if let url = await organizerVM.exportLogFile() {
-                        if FileManager.default.fileExists(atPath: url.path) {
-                            NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
-                        } else {
-                            showNoLogAlert = true
+            // Export — Pro only
+            if isPro {
+                Button {
+                    Task {
+                        if let url = await organizerVM.exportLogFile() {
+                            if FileManager.default.fileExists(atPath: url.path) {
+                                NSWorkspace.shared.selectFile(url.path, inFileViewerRootedAtPath: "")
+                            } else {
+                                showNoLogAlert = true
+                            }
                         }
                     }
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
                 }
-            } label: {
-                Image(systemName: "square.and.arrow.up")
+                .buttonStyle(SecondaryButtonStyle()).controlSize(.small).help("Show log file in Finder")
+            } else {
+                Button {
+                    showUpgrade = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: "lock.fill").font(.system(size: 8))
+                    }
+                }
+                .buttonStyle(SecondaryButtonStyle()).controlSize(.small).help("Pro: Export log file")
             }
-            .buttonStyle(SecondaryButtonStyle()).controlSize(.small).help("Show log file in Finder")
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
     }

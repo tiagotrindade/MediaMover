@@ -67,6 +67,16 @@ struct MoverView: View {
                 ProgressOverlayView(viewModel: viewModel)
             }
         }
+        .sheet(isPresented: $viewModel.showUpgradeSheet) {
+            UpgradeView()
+        }
+        .alert("Free Version Limit", isPresented: $viewModel.showFileLimitAlert) {
+            Button("Continue with first 100") { viewModel.beginOrganizingWithLimit() }
+            Button("Upgrade to Pro") { viewModel.showUpgradeSheet = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Free version processes up to 100 files per operation. You have \(viewModel.fileLimitAlertCount) files. Upgrade to Pro for unlimited.")
+        }
     }
 }
 

@@ -50,6 +50,16 @@ struct RenameView: View {
                 RenameProgressOverlay(viewModel: viewModel)
             }
         }
+        .sheet(isPresented: $viewModel.showUpgradeSheet) {
+            UpgradeView()
+        }
+        .alert("Free Version Limit", isPresented: $viewModel.showFileLimitAlert) {
+            Button("Continue with first 100") { viewModel.beginRenameWithLimit() }
+            Button("Upgrade to Pro") { viewModel.showUpgradeSheet = true }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Free version processes up to 100 files per operation. You have \(viewModel.fileLimitAlertCount) files. Upgrade to Pro for unlimited.")
+        }
     }
 }
 
@@ -198,10 +208,28 @@ struct RenameConfigPanel: View {
 
     private var renameModeToggle: some View {
         VStack(alignment: .leading, spacing: 7) {
-            sectionHeader("Rename Mode")
-            Picker("", selection: $viewModel.useRegexMode) {
+            HStack {
+                sectionHeader("Rename Mode")
+                ProInlineBadge(gate: .regexRename)
+            }
+            Picker("", selection: Binding(
+                get: { viewModel.useRegexMode },
+                set: { newValue in
+                    if newValue && !ProManager.shared.isPro {
+                        viewModel.showUpgradeSheet = true
+                    } else {
+                        viewModel.useRegexMode = newValue
+                    }
+                }
+            )) {
                 Text("Pattern").tag(false)
-                Text("Regex").tag(true)
+                HStack(spacing: 4) {
+                    Text("Regex")
+                    if !ProManager.shared.isPro {
+                        Image(systemName: "lock.fill").font(.system(size: 8))
+                    }
+                }
+                .tag(true)
             }
             .pickerStyle(.segmented)
             .onChange(of: viewModel.useRegexMode) {
@@ -269,8 +297,28 @@ struct RenameConfigPanel: View {
                     Label("Pattern", systemImage: "textformat.abc")
                         .font(.system(size: 12)).foregroundStyle(.secondary)
                     Spacer()
-                    Picker("", selection: $viewModel.pattern) {
-                        ForEach(RenamePattern.allCases) { p in Text(p.displayName).tag(p) }
+                    Picker("", selection: Binding(
+                        get: { viewModel.pattern },
+                        set: { newPattern in
+                            let isPro = ProManager.shared.isPro
+                            if !isPro && !RenameViewModel.freeRenamePatterns.contains(newPattern) {
+                                viewModel.showUpgradeSheet = true
+                            } else {
+                                viewModel.pattern = newPattern
+                            }
+                        }
+                    )) {
+                        let isPro = ProManager.shared.isPro
+                        ForEach(RenamePattern.allCases) { p in
+                            let isLocked = !isPro && !RenameViewModel.freeRenamePatterns.contains(p)
+                            HStack {
+                                Text(p.displayName)
+                                if isLocked {
+                                    Image(systemName: "lock.fill").font(.system(size: 8))
+                                }
+                            }
+                            .tag(p)
+                        }
                     }
                     .labelsHidden().frame(maxWidth: 180)
                     .onChange(of: viewModel.pattern) {

@@ -97,6 +97,11 @@ final class OrganizerViewModel {
     // Undo result
     var undoMessage: String?
 
+    // Pro gate alerts
+    var showFileLimitAlert: Bool = false
+    var fileLimitAlertCount: Int = 0
+    var showUpgradeSheet: Bool = false
+
     // MARK: - Folder Selection
 
     func selectSource() {
@@ -172,9 +177,10 @@ final class OrganizerViewModel {
         }
 
         if !Task.isCancelled {
-            // Reverse geocode GPS coordinates if enabled
+            // Reverse geocode GPS coordinates if enabled (Pro only)
             let hasGPSFiles = files.contains(where: { $0.hasGPS })
-            if geocodingEnabled && hasGPSFiles {
+            let canGeocode = geocodingEnabled && ProManager.shared.isPro
+            if canGeocode && hasGPSFiles {
                 let gpsCount = files.filter(\.hasGPS).count
                 scanMessage = "Resolving locations (0/\(gpsCount))..."
                 geocodingMessage = "Resolving GPS locations..."
@@ -198,7 +204,21 @@ final class OrganizerViewModel {
 
     // MARK: - Preview Generation
 
+    /// The 3 Free folder templates.
+    static let freeFolderTemplates: Set<String> = [
+        "{YYYY}/{MM}/{DD}",
+        "{YYYY}/{MM}",
+        "{YYYY}_{MM}_{DD}",
+    ]
+
     func generatePreview() {
+        // Enforce Free folder template if not Pro
+        if !ProManager.shared.isPro {
+            if !Self.freeFolderTemplates.contains(folderTemplate) {
+                folderTemplate = "{YYYY}/{MM}/{DD}"
+            }
+        }
+
         // Validate template
         templateValidation = TemplateEngine.validate(folderTemplate)
 
@@ -249,11 +269,43 @@ final class OrganizerViewModel {
     // MARK: - Organize
 
     func beginOrganizing() {
+        let isPro = ProManager.shared.isPro
+
+        // Filter out Pro-only files in Free mode
+        var filesToProcess = discoveredFiles
+        if !isPro {
+            filesToProcess = filesToProcess.filter { !$0.requiresPro }
+        }
+
+        // Check file limit in Free mode
+        if !isPro && filesToProcess.count > FeatureGate.freeFileLimit {
+            fileLimitAlertCount = filesToProcess.count
+            showFileLimitAlert = true
+            return
+        }
+
         currentTask = Task { await startOrganizing() }
     }
 
-    func startOrganizing() async {
+    /// Called when user chooses "Continue with first 100" from the file limit alert.
+    func beginOrganizingWithLimit() {
+        currentTask = Task { await startOrganizing(applyFreeLimit: true) }
+    }
+
+    func startOrganizing(applyFreeLimit: Bool = false) async {
         guard !discoveredFiles.isEmpty, let destination = destinationURL else { return }
+
+        let isPro = ProManager.shared.isPro
+
+        // Apply Pro gates to the file list
+        var filesToOrganize = discoveredFiles
+        if !isPro {
+            filesToOrganize = filesToOrganize.filter { !$0.requiresPro }
+            if applyFreeLimit && filesToOrganize.count > FeatureGate.freeFileLimit {
+                filesToOrganize = Array(filesToOrganize.prefix(FeatureGate.freeFileLimit))
+            }
+        }
+
         isProcessing = true
         progress = 0
         currentFileIndex = 0
@@ -265,7 +317,7 @@ final class OrganizerViewModel {
         estimatedTimeRemaining = 0
 
         let organizer = FileOrganizer()
-        let files = discoveredFiles
+        let files = filesToOrganize
 
         let config = OrganizerConfig(
             mode: operationMode,
@@ -459,11 +511,14 @@ final class OrganizerViewModel {
 
         let ext = url.pathExtension.lowercased()
         let mediaType = SupportedFormats.mediaType(for: ext)
+        let isProFormat = SupportedFormats.isProFormat(ext)
+
+        var file: MediaFile
 
         switch mediaType {
         case .photo:
             let meta = MetadataExtractor.extractExtendedPhotoMetadata(from: url)
-            return MediaFile(
+            file = MediaFile(
                 url: url,
                 dateTaken: meta.dateTaken,
                 cameraModel: meta.cameraModel,
@@ -480,7 +535,7 @@ final class OrganizerViewModel {
             )
         case .video:
             let meta = await MetadataExtractor.extractExtendedVideoMetadata(from: url)
-            return MediaFile(
+            file = MediaFile(
                 url: url,
                 dateTaken: meta.dateTaken,
                 cameraModel: meta.cameraModel,
@@ -492,7 +547,7 @@ final class OrganizerViewModel {
                 gpsLongitude: meta.gpsLongitude
             )
         case .other, nil:
-            return MediaFile(
+            file = MediaFile(
                 url: url,
                 dateTaken: nil,
                 cameraModel: nil,
@@ -502,5 +557,10 @@ final class OrganizerViewModel {
                 mediaType: mediaType
             )
         }
+
+        // Tag RAW/pro formats so the UI can show a Pro badge
+        file.requiresPro = isProFormat
+
+        return file
     }
 }

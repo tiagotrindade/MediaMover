@@ -105,20 +105,34 @@ struct TemplateBuilderView: View {
     }
 
     private var presetChips: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let isPro = ProManager.shared.isPro
+
+        return VStack(alignment: .leading, spacing: 4) {
             Text("Presets").font(.system(size: 10, weight: .medium)).foregroundStyle(.tertiary)
             FlowLayout(spacing: 4) {
-                ForEach(TemplateEngine.folderPresets, id: \.template) { preset in
+                ForEach(Array(TemplateEngine.folderPresets.enumerated()), id: \.element.template) { index, preset in
+                    let isLocked = !isPro && index >= FeatureGate.freeFolderPresetCount
                     Button {
-                        template = preset.template
+                        if isLocked {
+                            // Don't change template; upgrade sheet will be shown by ConfigPanel's onChange
+                        } else {
+                            template = preset.template
+                        }
                     } label: {
-                        Text(preset.name)
-                            .font(.system(size: 10))
-                            .foregroundStyle(template == preset.template ? .white : .secondary)
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(
-                                Capsule().fill(template == preset.template ? Color.accentColor : Color(NSColor.controlBackgroundColor))
-                            )
+                        HStack(spacing: 3) {
+                            Text(preset.name)
+                                .font(.system(size: 10))
+                                .foregroundStyle(template == preset.template ? Color.white : (isLocked ? Color.gray.opacity(0.5) : Color.secondary))
+                            if isLocked {
+                                Image(systemName: "lock.fill")
+                                    .font(.system(size: 7))
+                                    .foregroundStyle(template == preset.template ? Color.white.opacity(0.7) : Color.gray.opacity(0.5))
+                            }
+                        }
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(template == preset.template ? Color.accentColor : Color(NSColor.controlBackgroundColor))
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -132,7 +146,11 @@ struct TemplateBuilderView: View {
 struct TokenPaletteView: View {
     let onInsert: (TemplateToken) -> Void
 
+    @State private var showUpgrade = false
+
     var body: some View {
+        let isPro = ProManager.shared.isPro
+
         VStack(alignment: .leading, spacing: 10) {
             Text("Insert Token")
                 .font(.system(size: 12, weight: .semibold))
@@ -145,25 +163,38 @@ struct TokenPaletteView: View {
 
                     FlowLayout(spacing: 4) {
                         ForEach(group.tokens, id: \.displayLabel) { token in
+                            let isProToken = token.isLocationToken || isExtendedExifToken(token)
+                            let isLocked = !isPro && isProToken
+
                             Button {
-                                onInsert(token)
+                                if isLocked {
+                                    showUpgrade = true
+                                } else {
+                                    onInsert(token)
+                                }
                             } label: {
-                                Text(token.displayLabel)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(token.isLocationToken ? .tertiary : .primary)
-                                    .padding(.horizontal, 6).padding(.vertical, 2)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 4)
-                                            .fill(tokenColor(for: token).opacity(0.12))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 4)
-                                                    .strokeBorder(tokenColor(for: token).opacity(0.2), lineWidth: 0.5)
-                                            )
-                                    )
+                                HStack(spacing: 2) {
+                                    Text(token.displayLabel)
+                                        .font(.system(size: 11, design: .monospaced))
+                                        .foregroundStyle(isLocked ? .tertiary : .primary)
+                                    if isLocked {
+                                        Image(systemName: "lock.fill")
+                                            .font(.system(size: 7))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .fill(tokenColor(for: token).opacity(isLocked ? 0.05 : 0.12))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 4)
+                                                .strokeBorder(tokenColor(for: token).opacity(isLocked ? 0.1 : 0.2), lineWidth: 0.5)
+                                        )
+                                )
                             }
                             .buttonStyle(.plain)
-                            .disabled(token.isLocationToken)
-                            .help(token.isLocationToken ? "Coming soon \u{2014} requires GPS data" : token.displayLabel)
+                            .help(isLocked ? "Pro feature" : token.displayLabel)
                         }
                     }
                 }
@@ -171,6 +202,18 @@ struct TokenPaletteView: View {
         }
         .padding(12)
         .frame(width: 300)
+        .sheet(isPresented: $showUpgrade) {
+            UpgradeView()
+        }
+    }
+
+    private func isExtendedExifToken(_ token: TemplateToken) -> Bool {
+        switch token {
+        case .lens, .iso, .aperture, .shutterSpeed:
+            return true
+        default:
+            return false
+        }
     }
 
     private func tokenColor(for token: TemplateToken) -> Color {
