@@ -1,14 +1,16 @@
 # FolioSort
 
-A native macOS app to organize and rename photos, videos, and other files based on EXIF metadata, GPS location, or file dates. Features a flexible template engine for folder structures, preset profiles, regex-powered mass rename, reverse geocoding, and full undo support.
+A native macOS app to organize and rename photos, videos, and other files based on EXIF metadata, GPS location, or file dates. Features a flexible template engine for folder structures, preset profiles, regex-powered mass rename, reverse geocoding, Free/Pro tiers, and full undo support.
 
 ## Download
 
 **[Download latest DMG](https://github.com/tiagotrindade/FolioSort/releases/latest)** — macOS 14+ (Apple Silicon & Intel)
 
-## Screenshot
+## Screenshots
 
-![FolioSort](docs/screenshot.png)
+| Mover | Rename |
+|:---:|:---:|
+| ![Mover](docs/screenshot-mover.png) | ![Rename](docs/screenshot-rename.png) |
 
 ## Features
 
@@ -19,16 +21,20 @@ A native macOS app to organize and rename photos, videos, and other files based 
 - **EXIF-based sorting** — reads DateTaken from photo EXIF data
 - **Video metadata** — reads creation date from MOV, MP4, MKV and other formats
 - **Copy or Move mode** — choose whether to keep or move originals
+- **Rename with date prefix** — optionally prepend date-time to filenames during organization
+- **Videos subfolder** — separate videos into a dedicated `Videos` subfolder within each date folder
 - **Non-media files** — optionally include documents, archives, and any other file types
 - **Preview before organizing** — scan files and review the folder tree before committing
 - **Thumbnail previews** — toggle on/off for faster scanning on large libraries
+- **Drag & drop** — drop source and destination folders directly onto the app
 
 ### GPS Reverse Geocoding
 - **Automatic location detection** — reads GPS coordinates from photo/video EXIF data
 - **Reverse geocoding** — resolves GPS to city, country, state using Apple's CLGeocoder
-- **Location tokens** — use `{City}`, `{Country}`, `{State}` in folder templates
+- **Location tokens** — use `{City}`, `{Country}`, `{State}`, `{Locality}` in folder templates
 - **Smart caching** — in-memory + disk cache with coordinate rounding (~110m precision)
 - **Rate limiting** — respects Apple's geocoding limits with request coalescing
+- **Cancellable** — geocoding tasks respect cancellation during long scans
 
 ### Date Handling
 - **EXIF date chain**: DateTimeOriginal → DateTimeDigitized → TIFFDateTime (supports scanned photos)
@@ -44,17 +50,18 @@ A native macOS app to organize and rename photos, videos, and other files based 
 - **Live preview** — see before/after filenames with regex match highlighting
 - **Common regex presets** — Remove prefix, Replace spaces, Extract date digits, Remove trailing numbers
 - **Rename in place or copy** — rename files where they are, or copy to a new folder
+- **Non-media file handling** — "other" files get a simplified date-prefix rename path
 
 ### Integrity Verification
 - **Post-copy/move checksum** verification enabled by default
-- **XXHash64** — fast hashing for large batches
-- **SHA-256** — option for maximum security
+- **XXHash64** — fast hashing for large batches (Free tier)
+- **SHA-256** — option for maximum security (Pro)
 - **Move mode**: source hash computed before the move and compared after
 
 ### Duplicate Detection
-- **Ask Each Time** — per-file dialog: rename, replace, replace if larger, or skip (with "apply to all" option)
-- **Automatic** — configurable default action (rename / replace / replace if larger)
-- **Don't Move** — skip all duplicates
+- **Skip** — skip all duplicates (Free tier)
+- **Ask Each Time** — per-file dialog: rename, replace, replace if larger, or skip (with "apply to all" option) (Pro)
+- **Automatic** — configurable default action: rename, replace, or replace if larger (Pro)
 
 ### Activity Log
 - Full operation log with timestamps and status indicators
@@ -68,17 +75,42 @@ A native macOS app to organize and rename photos, videos, and other files based 
 - Persistent history across sessions (up to 50 batches)
 - Automatic cleanup of empty directories
 
+### Free & Pro Tiers
+
+FolioSort works out of the box with a generous Free tier. Pro unlocks advanced features for power users.
+
+| Feature | Free | Pro |
+|---|:---:|:---:|
+| Files per operation | 100 | Unlimited |
+| Folder presets | 3 | All |
+| Custom templates | — | ✓ |
+| Custom profiles | — | ✓ |
+| Rename presets | 3 | All |
+| Regex rename | — | ✓ |
+| RAW photo formats | — | ✓ |
+| RAW video formats | — | ✓ |
+| Other (non-media) files | — | ✓ |
+| SHA-256 hashing | — | ✓ |
+| Advanced duplicate handling | — | ✓ |
+| Rename with date prefix | — | ✓ |
+| Videos subfolder | — | ✓ |
+| Reverse geocoding | — | ✓ |
+| Location tokens (City, Country) | — | ✓ |
+| Extended EXIF tokens (Lens, ISO) | — | ✓ |
+| Activity log search & export | — | ✓ |
+| Persistent undo history | — | ✓ |
+
 ### Supported Formats
 
 **Photos**: JPG, JPEG, PNG, HEIC, HEIF, TIFF, TIF, BMP, GIF, WebP
 
-**RAW Photos**: CR2, CR3, CRW (Canon), NEF, NRW (Nikon), ARW, SR2, SRF (Sony), DNG (Adobe), ORF (Olympus), RAF (Fujifilm), RW2 (Panasonic), PEF (Pentax), SRW (Samsung), X3F (Sigma), IIQ, 3FR, FFF (Medium Format), RWL, MRW, ERF, KDC, DCR
+**RAW Photos** (Pro): CR2, CR3, CRW (Canon), NEF, NRW (Nikon), ARW, SR2, SRF (Sony), DNG (Adobe), ORF (Olympus), RAF (Fujifilm), RW2 (Panasonic), PEF (Pentax), SRW (Samsung), X3F (Sigma), IIQ, 3FR, FFF (Medium Format), RWL, MRW, ERF, KDC, DCR
 
 **Videos**: MOV, MP4, AVI, MKV, M4V, 3GP, WMV, FLV, WebM, MTS, M2TS, TS, MPG, MPEG, VOB
 
-**RAW Video**: BRAW (Blackmagic), R3D (RED), ARI/ARR (ARRI), CRM (Canon Cinema)
+**RAW Video** (Pro): BRAW (Blackmagic), R3D (RED), ARI/ARR (ARRI), CRM (Canon Cinema)
 
-**Other**: Any file type can be included via the "Other Files" toggle
+**Other** (Pro): Any file type can be included via the "Other Files" toggle
 
 ## Requirements
 
@@ -91,13 +123,13 @@ A native macOS app to organize and rename photos, videos, and other files based 
 # Build and run
 swift build && swift run
 
-# Create release build
-swift build -c release
+# Create release DMG
+make dmg
 ```
 
 ## Usage
 
-The app uses a sidebar with four sections: **Mover**, **Rename**, **Activity**, and **Settings**.
+The app uses a sidebar with four sections: **Mover**, **Rename**, **Activity**, and **Settings**. A guided onboarding wizard is shown on first launch.
 
 ### Mover (Organize files into folders)
 The Mover view has three panels: source file list, configuration, and a live folder tree preview.
@@ -106,7 +138,7 @@ The Mover view has three panels: source file list, configuration, and a live fol
 2. Select a **destination folder** in the config panel
 3. Choose a **folder pattern** from the dropdown (YYYY/MM/DD, YYYY_MM_DD, etc.)
 4. Toggle **Advanced** to access the full template builder with token palette, presets, and profiles
-5. Configure options: Mode (Copy/Move), File types, Duplicates, Integrity verification, Date fallback
+5. Configure options: Mode (Copy/Move), Rename with date, File types, Duplicates, Integrity verification, Date fallback
 6. The **Preview panel** updates live as you change settings
 7. Click **Start** to organize
 
@@ -121,6 +153,9 @@ The Mover view has three panels: source file list, configuration, and a live fol
 
 ### Activity
 Full operation history with timestamps, status indicators, search, and export.
+
+### Settings
+View Pro status, toggle Pro features, and access developer tools.
 
 ### Undo
 Use the **Undo** button in the toolbar to reverse the last operation.
