@@ -54,7 +54,8 @@ struct PreviewPanel: View {
                     .background(Capsule().fill(Color(NSColor.controlBackgroundColor)))
             }
         }
-        .padding(.horizontal, 12).padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .frame(height: 36)
     }
 
     // MARK: - Empty state

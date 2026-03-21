@@ -13,7 +13,8 @@ struct ConfigPanel: View {
                     .tracking(0.5)
                 Spacer()
             }
-            .padding(.horizontal, 12).padding(.vertical, 10)
+            .padding(.horizontal, 12)
+            .frame(height: 36)
             Divider()
             ScrollView {
                 VStack(spacing: 18) {

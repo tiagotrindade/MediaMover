@@ -34,7 +34,8 @@ struct SourcePanel: View {
                     .background(Capsule().fill(Color.accentColor.opacity(0.12)))
             }
         }
-        .padding(.horizontal, 12).padding(.vertical, 10)
+        .padding(.horizontal, 12)
+        .frame(height: 36)
     }
 
     // MARK: - Folder picker

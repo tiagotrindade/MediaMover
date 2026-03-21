@@ -104,7 +104,7 @@ struct OnboardingView: View {
                     .buttonStyle(PrimaryButtonStyle())
                 } else {
                     Button("Get Started") {
-                        UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
+                        UserDefaults.standard.set(2, forKey: "completedOnboardingVersion")
                         isPresented = false
                     }
                     .buttonStyle(PrimaryButtonStyle())

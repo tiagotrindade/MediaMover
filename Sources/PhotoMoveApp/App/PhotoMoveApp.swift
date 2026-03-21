@@ -30,7 +30,14 @@ struct ContentView: View {
     @State private var selection: SidebarItem? = .mover
     @State private var organizerVM = OrganizerViewModel()
     @State private var renameVM    = RenameViewModel()
-    @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+    /// Bump this number whenever the onboarding content changes significantly
+    /// (e.g. major feature additions) to re-show the wizard to returning users.
+    private static let currentOnboardingVersion = 2
+
+    @State private var showOnboarding: Bool = {
+        let completed = UserDefaults.standard.integer(forKey: "completedOnboardingVersion")
+        return completed < ContentView.currentOnboardingVersion
+    }()
 
     var body: some View {
         NavigationSplitView {
