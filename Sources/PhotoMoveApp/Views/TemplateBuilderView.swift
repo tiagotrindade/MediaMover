@@ -8,6 +8,7 @@ struct TemplateBuilderView: View {
     var previewFiles: [MediaFile]
 
     @State private var showTokenPalette = false
+    @State private var showUpgradeSheet = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -102,6 +103,9 @@ struct TemplateBuilderView: View {
             // Preset chips
             presetChips
         }
+        .sheet(isPresented: $showUpgradeSheet) {
+            UpgradeView()
+        }
     }
 
     private var presetChips: some View {
@@ -114,7 +118,7 @@ struct TemplateBuilderView: View {
                     let isLocked = !isPro && index >= FeatureGate.freeFolderPresetCount
                     Button {
                         if isLocked {
-                            // Don't change template; upgrade sheet will be shown by ConfigPanel's onChange
+                            showUpgradeSheet = true
                         } else {
                             template = preset.template
                         }

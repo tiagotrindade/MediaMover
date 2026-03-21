@@ -357,7 +357,9 @@ struct RenameConfigPanel: View {
                 HStack(spacing: 12) {
                     TypeToggle(label: "Photos", icon: "photo", color: .blue, isOn: $viewModel.includePhotos)
                     TypeToggle(label: "Videos", icon: "video", color: .purple, isOn: $viewModel.includeVideos)
-                    TypeToggle(label: "Other", icon: "doc", color: .gray, isOn: $viewModel.includeOtherFiles)
+                    ProLockedRow(gate: .otherFiles) {
+                        TypeToggle(label: "Other", icon: "doc", color: .gray, isOn: $viewModel.includeOtherFiles)
+                    }
                 }
                 .padding(.horizontal, 12).padding(.vertical, 8)
                 Divider().padding(.horizontal, 10)

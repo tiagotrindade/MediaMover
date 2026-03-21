@@ -195,7 +195,7 @@ final class RenameViewModel {
         // Track media vs other files separately for sequence numbering
         var mediaSeq = 0
         for file in files {
-            let isOther = file.mediaType == .other || file.mediaType == nil
+            let isOther = file.mediaType == .other
 
             if isOther {
                 // Other files: limited rename patterns (only date-based if date available)

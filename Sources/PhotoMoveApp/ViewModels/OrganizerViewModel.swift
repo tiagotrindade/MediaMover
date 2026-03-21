@@ -554,7 +554,7 @@ final class OrganizerViewModel {
                 fileCreationDate: creationDate,
                 fileModificationDate: modDate,
                 fileSize: fileSize,
-                mediaType: mediaType
+                mediaType: .other
             )
         }
 

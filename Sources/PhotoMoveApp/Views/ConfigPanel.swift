@@ -28,10 +28,28 @@ struct ConfigPanel: View {
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
-        .onChange(of: viewModel.renameWithDate)    { viewModel.generatePreview() }
+        .onChange(of: viewModel.renameWithDate) {
+            if !ProManager.shared.isPro && viewModel.renameWithDate {
+                viewModel.renameWithDate = false
+                viewModel.showUpgradeSheet = true
+            }
+            viewModel.generatePreview()
+        }
         .onChange(of: viewModel.folderTemplate)    { viewModel.generatePreview() }
-        .onChange(of: viewModel.separateVideos)    { viewModel.generatePreview() }
+        .onChange(of: viewModel.separateVideos) {
+            if !ProManager.shared.isPro && viewModel.separateVideos {
+                viewModel.separateVideos = false
+                viewModel.showUpgradeSheet = true
+            }
+            viewModel.generatePreview()
+        }
         .onChange(of: viewModel.dateFallback)      { viewModel.generatePreview() }
+        .onChange(of: viewModel.includeOtherFiles) {
+            if !ProManager.shared.isPro && viewModel.includeOtherFiles {
+                viewModel.includeOtherFiles = false
+                viewModel.showUpgradeSheet = true
+            }
+        }
     }
 
     // MARK: - Section header
