@@ -30,6 +30,7 @@ struct ContentView: View {
     @State private var selection: SidebarItem? = .mover
     @State private var organizerVM = OrganizerViewModel()
     @State private var renameVM    = RenameViewModel()
+    @State private var hasValidatedLicense = false
     /// Bump this number whenever the onboarding content changes significantly
     /// (e.g. major feature additions) to re-show the wizard to returning users.
     private static let currentOnboardingVersion = 2
@@ -58,6 +59,12 @@ struct ContentView: View {
         .frame(minWidth: 900, minHeight: 600)
         .sheet(isPresented: $showOnboarding) {
             OnboardingView(isPresented: $showOnboarding, viewModel: organizerVM)
+        }
+        .task {
+            // Validate license on launch (once per app session)
+            guard !hasValidatedLicense else { return }
+            hasValidatedLicense = true
+            await ProManager.shared.validateOnLaunch()
         }
     }
 

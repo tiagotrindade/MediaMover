@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     var viewModel: OrganizerViewModel
     @State private var showUpgrade = false
+    @State private var showDeactivateConfirm = false
+    @State private var isDeactivating = false
 
     var body: some View {
         ScrollView {
@@ -10,7 +12,12 @@ struct SettingsView: View {
                 // Pro Status
                 proStatusSection
 
-                // C-06 FIX: Dev section removed for production release
+                // License info (when Pro is active)
+                if ProManager.shared.isPro {
+                    licenseSection
+                }
+
+                // C-06 FIX: Dev section only in DEBUG builds
                 #if DEBUG
                 devSection
                 #endif
@@ -22,6 +29,10 @@ struct SettingsView: View {
         .background(Color(NSColor.windowBackgroundColor))
         .sheet(isPresented: $showUpgrade) {
             UpgradeView()
+        }
+        .task {
+            // Re-validate license on settings view appearance
+            await ProManager.shared.validateOnLaunch()
         }
     }
 
@@ -35,9 +46,9 @@ struct SettingsView: View {
                     .foregroundStyle(.orange)
                 Text("FolioSort Pro")
                     .font(.system(size: 18, weight: .bold))
-                Text("All features unlocked")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+
+                // Status badge
+                statusBadge
             } else {
                 Image(systemName: "crown")
                     .font(.system(size: 36))
@@ -69,8 +80,99 @@ struct SettingsView: View {
         )
     }
 
-    // MARK: - Development (remove before release)
+    // MARK: - Status Badge
 
+    @ViewBuilder
+    private var statusBadge: some View {
+        switch ProManager.shared.licenseStatus {
+        case .active:
+            Label("License active", systemImage: "checkmark.circle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.green)
+        case .offline:
+            Label("Offline mode — license will re-validate when online", systemImage: "wifi.slash")
+                .font(.system(size: 11))
+                .foregroundStyle(.orange)
+        case .expired:
+            Label("License expired", systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.red)
+        case .disabled:
+            Label("License disabled", systemImage: "xmark.circle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.red)
+        case .invalid:
+            Label("License invalid", systemImage: "xmark.circle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.red)
+        case .none:
+            EmptyView()
+        }
+    }
+
+    // MARK: - License Section
+
+    private var licenseSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 5) {
+                Image(systemName: "key.fill")
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                Text("LICENSE")
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary).tracking(0.5)
+            }
+
+            VStack(spacing: 0) {
+                // Masked key display
+                HStack {
+                    Label("License Key", systemImage: "key")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                    Spacer()
+                    Text(ProManager.shared.maskedKey)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 10)
+
+                Divider().padding(.horizontal, 12)
+
+                // Deactivate button
+                HStack {
+                    Label("Deactivate License", systemImage: "arrow.uturn.backward")
+                        .font(.system(size: 12)).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(isDeactivating ? "Deactivating..." : "Deactivate") {
+                        showDeactivateConfirm = true
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(.red)
+                    .buttonStyle(.plain)
+                    .disabled(isDeactivating)
+                }
+                .padding(.horizontal, 12).padding(.vertical, 10)
+            }
+            .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
+
+            Text("Deactivating frees this license to be used on another Mac.")
+                .font(.system(size: 10))
+                .foregroundStyle(.tertiary)
+        }
+        .alert("Deactivate License?", isPresented: $showDeactivateConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Deactivate", role: .destructive) {
+                isDeactivating = true
+                Task {
+                    await ProManager.shared.deactivate()
+                    isDeactivating = false
+                }
+            }
+        } message: {
+            Text("This will disable Pro features on this Mac. You can re-activate later with the same license key.")
+        }
+    }
+
+    // MARK: - Development (DEBUG only)
+
+    #if DEBUG
     private var devSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 5) {
@@ -103,9 +205,10 @@ struct SettingsView: View {
             }
             .background(RoundedRectangle(cornerRadius: 8).fill(Color(NSColor.controlBackgroundColor)))
 
-            Text("Toggle Pro mode for testing. Remove before release.")
+            Text("Toggle Pro mode for testing. Only visible in DEBUG builds.")
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
         }
     }
+    #endif
 }
