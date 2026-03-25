@@ -10,8 +10,10 @@ struct SettingsView: View {
                 // Pro Status
                 proStatusSection
 
-                // Development section (remove before release)
+                // C-06 FIX: Dev section removed for production release
+                #if DEBUG
                 devSection
+                #endif
             }
             .padding(40)
             .frame(maxWidth: 500)

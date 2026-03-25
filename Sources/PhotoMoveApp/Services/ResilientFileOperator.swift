@@ -59,15 +59,27 @@ actor ResilientFileOperator {
 
     func resume() {
         isPaused = false
-        pauseContinuation?.resume()
+        // C-01 FIX: Resume the stored continuation safely and clear it
+        let continuation = pauseContinuation
         pauseContinuation = nil
+        continuation?.resume()
     }
 
     /// Waits if the operator is paused. Returns when resumed or cancelled.
     private func waitIfPaused() async {
         guard isPaused else { return }
+        // C-01 FIX: Cancel any previously stored continuation before storing a new one
+        let oldContinuation = pauseContinuation
+        pauseContinuation = nil
+        oldContinuation?.resume()
+
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            pauseContinuation = continuation
+            if isPaused {
+                pauseContinuation = continuation
+            } else {
+                // Already resumed while we were setting up
+                continuation.resume()
+            }
         }
     }
 

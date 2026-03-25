@@ -22,17 +22,22 @@ struct FileEnumerator: Sendable {
         var results: [URL] = []
 
         if includeSubfolders {
+            // M-23 FIX: Add .isSymbolicLinkKey to detect and skip symlinks
+            let enumKeys = keys + [.isSymbolicLinkKey]
             guard let enumerator = fm.enumerator(
                 at: directory,
-                includingPropertiesForKeys: keys,
+                includingPropertiesForKeys: enumKeys,
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
             ) else {
+                // L-09 FIX: Log enumeration failures
+                print("[FileEnumerator] Warning: Failed to create enumerator for \(directory.path)")
                 return []
             }
 
             for case let fileURL as URL in enumerator {
-                guard let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey]),
-                      resourceValues.isRegularFile == true else { continue }
+                guard let resourceValues = try? fileURL.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+                      resourceValues.isRegularFile == true,
+                      resourceValues.isSymbolicLink != true else { continue }
 
                 let ext = fileURL.pathExtension.lowercased()
 
@@ -49,6 +54,7 @@ struct FileEnumerator: Sendable {
                 includingPropertiesForKeys: keys,
                 options: [.skipsHiddenFiles, .skipsPackageDescendants]
             ) else {
+                print("[FileEnumerator] Warning: Failed to list contents of \(directory.path)")
                 return []
             }
 

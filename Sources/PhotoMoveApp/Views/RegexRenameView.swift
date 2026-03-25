@@ -74,7 +74,8 @@ struct RegexRenameSection: View {
                         Image(systemName: viewModel.regexMatchCount > 0 ? "checkmark.circle.fill" : "xmark.circle.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(viewModel.regexMatchCount > 0 ? .green : .orange)
-                        Text("\(viewModel.regexMatchCount) file\(viewModel.regexMatchCount == 1 ? "" : "s") matched")
+                        // L-02 FIX: Correct grammar — "match" not "matched"
+                        Text("\(viewModel.regexMatchCount) file\(viewModel.regexMatchCount == 1 ? "" : "s") match")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                     }

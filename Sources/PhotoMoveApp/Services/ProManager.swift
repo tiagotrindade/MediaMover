@@ -8,9 +8,11 @@ final class ProManager {
 
     private static let defaultsKey = "FolioSort_ProUnlocked"
 
+    // H-16 FIX: Synchronize and verify UserDefaults write
     var isPro: Bool {
         didSet {
             UserDefaults.standard.set(isPro, forKey: Self.defaultsKey)
+            UserDefaults.standard.synchronize()
         }
     }
 

@@ -81,7 +81,8 @@ struct MetadataExtractor: Sendable {
                     shutterSpeed = String(format: "%.1fs", exposure)
                 } else {
                     let denominator = Int(round(1.0 / exposure))
-                    shutterSpeed = "1_\(denominator)"
+                    // L-10 FIX: Use standard slash notation instead of underscore
+                    shutterSpeed = "1-\(denominator)"
                 }
             }
         }
@@ -98,13 +99,14 @@ struct MetadataExtractor: Sendable {
 
         // GPS dictionary
         if let gps = properties[kCGImagePropertyGPSDictionary] as? [CFString: Any] {
+            // M-24 FIX: Handle non-standard GPS reference strings (e.g., "South", "West")
             if let lat = gps[kCGImagePropertyGPSLatitude] as? Double,
                let latRef = gps[kCGImagePropertyGPSLatitudeRef] as? String {
-                gpsLatitude = latRef == "S" ? -lat : lat
+                gpsLatitude = latRef.uppercased().hasPrefix("S") ? -lat : lat
             }
             if let lon = gps[kCGImagePropertyGPSLongitude] as? Double,
                let lonRef = gps[kCGImagePropertyGPSLongitudeRef] as? String {
-                gpsLongitude = lonRef == "W" ? -lon : lon
+                gpsLongitude = lonRef.uppercased().hasPrefix("W") ? -lon : lon
             }
         }
 

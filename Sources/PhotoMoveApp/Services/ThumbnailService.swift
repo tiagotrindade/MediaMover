@@ -29,10 +29,10 @@ final class ThumbnailService {
             cache.setObject(image, forKey: url as NSURL)
             return image
         } catch {
-            // Fallback to system icon
+            // M-33 FIX: Don't cache generic system icons by URL (wastes memory)
+            // Just return the icon without caching since it's the same for each file type
             let icon = NSWorkspace.shared.icon(forFile: url.path)
             icon.size = NSSize(width: 60, height: 60)
-            cache.setObject(icon, forKey: url as NSURL)
             return icon
         }
     }

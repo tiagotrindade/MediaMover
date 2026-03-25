@@ -484,7 +484,7 @@ private struct RenamePreviewRow2: View {
         HStack(spacing: 0) {
             Image(systemName: isOther ? "doc" : (isVideo ? "video" : "photo"))
                 .font(.system(size: 9))
-                .foregroundStyle(isOther ? Color.gray : (isVideo ? Color.purple : Color.blue))
+                .foregroundStyle(isOther ? Color.gray : (isVideo ? Color.green : Color.blue))
                 .frame(width: 16)
             Text(item.originalName)
                 .font(.system(size: 11)).foregroundStyle(.secondary)

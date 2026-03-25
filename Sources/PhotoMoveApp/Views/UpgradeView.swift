@@ -1,7 +1,10 @@
 import SwiftUI
+import StoreKit
 
 struct UpgradeView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var isRestoring = false
+    @State private var restoreMessage: String?
 
     private let features: [(category: String, items: [String])] = [
         ("Organization", [
@@ -94,11 +97,48 @@ struct UpgradeView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
 
+                // C-07 FIX: Restore result message
+                if let restoreMessage {
+                    Text(restoreMessage)
+                        .font(.system(size: 11))
+                        .foregroundStyle(restoreMessage.contains("No") ? .orange : .green)
+                }
+
                 HStack(spacing: 12) {
-                    Button("Restore Purchase") {
-                        // TODO: App Store restore
+                    Button(isRestoring ? "Restoring..." : "Restore Purchase") {
+                        // C-07 FIX: Implement App Store restore
+                        isRestoring = true
+                        restoreMessage = nil
+                        Task {
+                            do {
+                                try await AppStore.sync()
+                                // Check transaction history for Pro entitlement
+                                var foundPro = false
+                                for await result in Transaction.currentEntitlements {
+                                    if case .verified(_) = result {
+                                        foundPro = true
+                                        break
+                                    }
+                                }
+                                await MainActor.run {
+                                    if foundPro {
+                                        ProManager.shared.unlock()
+                                        restoreMessage = "Purchase restored!"
+                                    } else {
+                                        restoreMessage = "No previous purchase found."
+                                    }
+                                    isRestoring = false
+                                }
+                            } catch {
+                                await MainActor.run {
+                                    restoreMessage = "Restore failed. Try again later."
+                                    isRestoring = false
+                                }
+                            }
+                        }
                     }
                     .buttonStyle(SecondaryButtonStyle())
+                    .disabled(isRestoring)
 
                     Button("Unlock Pro") {
                         ProManager.shared.unlock()

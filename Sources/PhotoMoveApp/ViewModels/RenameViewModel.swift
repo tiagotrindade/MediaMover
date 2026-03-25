@@ -133,6 +133,8 @@ final class RenameViewModel {
     // MARK: - Scan + Preview
 
     func startScan() {
+        // M-08 FIX: Cancel previous scan/rename task
+        currentTask?.cancel()
         currentTask = Task { await scanAndPreview() }
     }
 
@@ -351,16 +353,24 @@ final class RenameViewModel {
             return
         }
 
+        // M-08 FIX: Cancel previous tasks before starting
+        currentTask?.cancel()
         currentTask = Task { await executeRename() }
     }
 
     /// Called when user chooses "Continue with first 100" from the file limit alert.
     func beginRenameWithLimit() {
+        currentTask?.cancel()
         currentTask = Task { await executeRename(applyFreeLimit: true) }
     }
 
     func executeRename(applyFreeLimit: Bool = false) async {
         guard !previewItems.isEmpty else { return }
+
+        // H-03 FIX: Validate destination when copy mode
+        if renameMode == .copyToFolder && destinationURL == nil {
+            return
+        }
 
         let isPro = ProManager.shared.isPro
         var itemsToProcess = previewItems
@@ -424,11 +434,13 @@ final class RenameViewModel {
                     try fm.moveItem(at: item.file.url, to: target)
                 }
                 renamedCount += 1
+                // L-12 FIX: Use consistent action name for both success and error
                 let action = isCopy ? "rename-copy" : "rename"
                 await logger.log(action: action, source: item.file.url.path, destination: target.path, status: .success)
             } catch {
                 errorCount += 1
-                await logger.log(action: "rename", source: item.file.url.path, status: .error, details: error.localizedDescription)
+                let action = isCopy ? "rename-copy" : "rename"
+                await logger.log(action: action, source: item.file.url.path, status: .error, details: error.localizedDescription)
             }
         }
 
@@ -448,13 +460,15 @@ final class RenameViewModel {
 
     // MARK: - ETA
 
+    // M-02 FIX: Guard against division by zero
     private func updateETA(processed: Int, total: Int) {
         guard let start = operationStartTime, processed > 0 else { return }
         let elapsed = Date().timeIntervalSince(start)
         guard elapsed > 0.001 else { return }
-        filesPerSecond = Double(processed) / elapsed
+        let fps = Double(processed) / elapsed
+        filesPerSecond = fps.isFinite ? fps : 0
         let remaining = total - processed
-        estimatedTimeRemaining = remaining > 0 ? Double(remaining) / filesPerSecond : 0
+        estimatedTimeRemaining = (remaining > 0 && fps > 0) ? Double(remaining) / fps : 0
     }
 
     // MARK: - Reset

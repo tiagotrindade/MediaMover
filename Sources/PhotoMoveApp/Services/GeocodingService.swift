@@ -25,8 +25,12 @@ actor GeocodingService {
         let locality: String?
     }
 
+    // C-05, M-38 FIX: Safe unwrap and handle cache file errors
     private init() {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            cacheURL = FileManager.default.temporaryDirectory.appendingPathComponent("FolioSort/geocoding_cache.json")
+            return
+        }
         let appDir = support.appendingPathComponent("FolioSort")
         try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
         cacheURL = appDir.appendingPathComponent("geocoding_cache.json")
@@ -49,22 +53,25 @@ actor GeocodingService {
             return cached
         }
 
-        // Coalesce concurrent requests for the same key
+        // C-03 FIX: Initialize pending array BEFORE checking, so concurrent callers
+        // can always append their continuation
         if pendingRequests[key] != nil {
             return await withCheckedContinuation { continuation in
                 pendingRequests[key]?.append(continuation)
             }
         }
 
+        // Initialize the pending array first so concurrent calls see it exists
         pendingRequests[key] = []
-
-        // Rate limiting
+        // H-15 FIX: Capture rate-limited time atomically
         let now = Date()
         let elapsed = now.timeIntervalSince(lastRequestTime)
+        lastRequestTime = now
+
+        // Rate limiting (time already captured above)
         if elapsed < minRequestInterval {
             try? await Task.sleep(nanoseconds: UInt64((minRequestInterval - elapsed) * 1_000_000_000))
         }
-        lastRequestTime = Date()
 
         // Perform geocoding
         let location = CLLocation(latitude: latitude, longitude: longitude)

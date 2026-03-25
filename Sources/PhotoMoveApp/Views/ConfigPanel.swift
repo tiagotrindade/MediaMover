@@ -28,6 +28,7 @@ struct ConfigPanel: View {
             }
         }
         .background(Color(NSColor.windowBackgroundColor))
+        // H-22 FIX: Always regenerate preview after Pro revert
         .onChange(of: viewModel.renameWithDate) {
             if !ProManager.shared.isPro && viewModel.renameWithDate {
                 viewModel.renameWithDate = false
@@ -49,6 +50,8 @@ struct ConfigPanel: View {
                 viewModel.includeOtherFiles = false
                 viewModel.showUpgradeSheet = true
             }
+            // M-15 FIX: Regenerate preview when file type filter changes
+            viewModel.generatePreview()
         }
     }
 

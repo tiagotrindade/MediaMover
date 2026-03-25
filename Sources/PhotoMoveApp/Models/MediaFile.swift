@@ -13,7 +13,9 @@ enum DateFallback: String, CaseIterable, Sendable {
     case none = "Skip (no fallback)"
 }
 
-struct MediaFile: Identifiable, Sendable {
+// C-04 FIX: Use @unchecked Sendable since mutable location fields are only
+// written during the single-threaded scan phase before crossing actor boundaries.
+struct MediaFile: Identifiable, @unchecked Sendable {
     let id = UUID()
     let url: URL
     let fileName: String

@@ -63,8 +63,13 @@ enum OrganizationPattern: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    // M-28 FIX: Include null char and prevent path traversal
     private func sanitizeFolderName(_ name: String) -> String {
-        let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|")
-        return name.components(separatedBy: illegal).joined(separator: "_").trimmingCharacters(in: .whitespaces)
+        let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|\0")
+        var sanitized = name.components(separatedBy: illegal).joined(separator: "_").trimmingCharacters(in: .whitespaces)
+        // Prevent hidden files and path traversal
+        while sanitized.hasPrefix(".") { sanitized = String(sanitized.dropFirst()) }
+        if sanitized.isEmpty { sanitized = "Unknown" }
+        return sanitized
     }
 }

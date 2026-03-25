@@ -33,8 +33,16 @@ struct OrganizerProfile: Identifiable, Codable, Sendable, Equatable {
     var dateFallback: String      // "File Creation Date", "File Modification Date", "Skip (no fallback)"
     var geocodingEnabled: Bool
 
+    // H-17 FIX: Compare all meaningful fields, not just ID
     static func == (lhs: OrganizerProfile, rhs: OrganizerProfile) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.name == rhs.name &&
+        lhs.folderTemplate == rhs.folderTemplate &&
+        lhs.operationMode == rhs.operationMode &&
+        lhs.separateVideos == rhs.separateVideos &&
+        lhs.renameWithDate == rhs.renameWithDate &&
+        lhs.verifyIntegrity == rhs.verifyIntegrity &&
+        lhs.hashAlgorithm == rhs.hashAlgorithm
     }
 
     // Provide default for geocodingEnabled so old JSON files decode without error
@@ -124,8 +132,16 @@ final class ProfileManager {
 
     private let presetsURL: URL
 
+    // C-05 FIX: Safe unwrap of Application Support directory
     private init() {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            let fallback = FileManager.default.temporaryDirectory.appendingPathComponent("FolioSort/presets")
+            try? FileManager.default.createDirectory(at: fallback, withIntermediateDirectories: true)
+            presetsURL = fallback
+            loadProfiles()
+            ensureBuiltInPresets()
+            return
+        }
         let appDir = support.appendingPathComponent("FolioSort/presets")
         try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
         presetsURL = appDir

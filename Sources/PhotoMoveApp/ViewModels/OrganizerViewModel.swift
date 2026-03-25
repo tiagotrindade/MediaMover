@@ -175,6 +175,8 @@ final class OrganizerViewModel {
     // MARK: - Scan
 
     func startScan() {
+        // H-26 FIX: Cancel previous task before starting a new one
+        currentTask?.cancel()
         currentTask = Task { await scanFiles() }
     }
 
@@ -285,9 +287,14 @@ final class OrganizerViewModel {
             }
             generatePreview()
         }
+        // M-03, M-04, M-06 FIX: Clean up all scan state on completion/cancellation
         isScanning = false
         scanMessage = ""
         operationStartTime = nil
+        isDownloadingiCloud = false
+        iCloudDownloadProgress = 0
+        iCloudFilesToDownload = 0
+        geocodingMessage = ""
     }
 
     // MARK: - Preview Generation
@@ -372,11 +379,14 @@ final class OrganizerViewModel {
             return
         }
 
+        // H-26 FIX: Cancel previous task before starting a new one
+        currentTask?.cancel()
         currentTask = Task { await startOrganizing() }
     }
 
     /// Called when user chooses "Continue with first 100" from the file limit alert.
     func beginOrganizingWithLimit() {
+        currentTask?.cancel()
         currentTask = Task { await startOrganizing(applyFreeLimit: true) }
     }
 
@@ -566,6 +576,12 @@ final class OrganizerViewModel {
         existingName: String,
         existingSize: Int64
     ) async -> DuplicateAction? {
+        // H-01 FIX: Resume any existing continuation before creating a new one
+        if let existing = duplicateContinuation {
+            duplicateContinuation = nil
+            existing.resume(returning: nil)
+        }
+
         return await withCheckedContinuation { continuation in
             Task { @MainActor in
                 self.duplicateSourceName = sourceName
@@ -600,6 +616,10 @@ final class OrganizerViewModel {
         currentTask = nil
         volumeMonitorTask?.cancel()
         volumeMonitorTask = nil
+        // M-03 FIX: Reset processing state on cancel
+        isProcessing = false
+        isScanning = false
+        isDownloadingiCloud = false
     }
 
     /// Dismiss disconnect alert and cancel the operation.
@@ -616,13 +636,15 @@ final class OrganizerViewModel {
 
     // MARK: - ETA
 
+    // M-01 FIX: Guard against division by zero
     private func updateETA(processed: Int, total: Int) {
         guard let start = operationStartTime, processed > 0 else { return }
         let elapsed = Date().timeIntervalSince(start)
         guard elapsed > 0.001 else { return }
-        filesPerSecond = Double(processed) / elapsed
+        let fps = Double(processed) / elapsed
+        filesPerSecond = fps.isFinite ? fps : 0
         let remaining = total - processed
-        estimatedTimeRemaining = remaining > 0 ? Double(remaining) / filesPerSecond : 0
+        estimatedTimeRemaining = (remaining > 0 && fps > 0) ? Double(remaining) / fps : 0
     }
 
     // MARK: - Reset

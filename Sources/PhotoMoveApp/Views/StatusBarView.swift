@@ -32,8 +32,8 @@ struct StatusBarView: View {
 
             Spacer()
 
-            // Right: version
-            Text("v0.9")
+            // L-01 FIX: Read version from Bundle instead of hardcoding
+            Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "2.1.0")")
                 .font(.system(size: 11)).foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 16).padding(.vertical, 5)

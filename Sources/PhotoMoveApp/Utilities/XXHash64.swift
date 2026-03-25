@@ -18,6 +18,9 @@ struct XXHash64Hasher: Sendable {
     private var v4: UInt64
     private var totalLen: UInt64 = 0
     private var memBuffer: [UInt8] = []
+    // M-34 FIX: Guard against re-finalization
+    private var isFinalized: Bool = false
+    private var cachedResult: UInt64 = 0
 
     init(seed: UInt64 = 0) {
         v1 = seed &+ Self.p1 &+ Self.p2
@@ -32,7 +35,9 @@ struct XXHash64Hasher: Sendable {
         processBlocks()
     }
 
-    func finalize() -> UInt64 {
+    mutating func finalize() -> UInt64 {
+        // M-34 FIX: Return cached result if already finalized
+        if isFinalized { return cachedResult }
         var h: UInt64
 
         if totalLen >= 32 {
@@ -77,10 +82,12 @@ struct XXHash64Hasher: Sendable {
         h &*= Self.p3
         h ^= h >> 32
 
+        isFinalized = true
+        cachedResult = h
         return h
     }
 
-    func finalizeHex() -> String {
+    mutating func finalizeHex() -> String {
         String(format: "%016llx", finalize())
     }
 
@@ -119,7 +126,9 @@ struct XXHash64Hasher: Sendable {
         (x << r) | (x >> (64 - r))
     }
 
+    // C-02 FIX: Bounds-checked reads
     private static func readLE64(_ buffer: [UInt8], offset: Int) -> UInt64 {
+        guard offset >= 0, offset + 8 <= buffer.count else { return 0 }
         var value: UInt64 = 0
         for i in 0..<8 {
             value |= UInt64(buffer[offset + i]) << (i * 8)
@@ -128,6 +137,7 @@ struct XXHash64Hasher: Sendable {
     }
 
     private static func readLE32(_ buffer: [UInt8], offset: Int) -> UInt32 {
+        guard offset >= 0, offset + 4 <= buffer.count else { return 0 }
         var value: UInt32 = 0
         for i in 0..<4 {
             value |= UInt32(buffer[offset + i]) << (i * 8)

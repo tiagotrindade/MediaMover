@@ -44,7 +44,9 @@ enum RenamePattern: String, CaseIterable, Identifiable, Sendable {
         sequenceNumber: Int
     ) -> String {
         let ext = (originalName as NSString).pathExtension.lowercased()
-        let stem = (originalName as NSString).deletingPathExtension
+        // L-08 FIX: Handle files with only extension (e.g., ".jpg") — use "file" as default stem
+        let rawStem = (originalName as NSString).deletingPathExtension
+        let stem = rawStem.isEmpty ? "file" : rawStem
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = TimeZone(identifier: "UTC")!
         let y = cal.component(.year, from: date)
@@ -83,8 +85,12 @@ enum RenamePattern: String, CaseIterable, Identifiable, Sendable {
         return ext.isEmpty ? newStem : "\(newStem).\(ext)"
     }
 
+    // L-07 FIX: Consistent sanitization — replace with underscore (matches OrganizationPattern)
     private func sanitize(_ name: String) -> String {
-        let illegal = CharacterSet(charactersIn: "/\\:*?\"<>| ")
-        return name.components(separatedBy: illegal).joined(separator: "").trimmingCharacters(in: .whitespaces)
+        let illegal = CharacterSet(charactersIn: "/\\:*?\"<>|\0 ")
+        var sanitized = name.components(separatedBy: illegal).joined(separator: "_").trimmingCharacters(in: .whitespaces)
+        while sanitized.hasPrefix(".") { sanitized = String(sanitized.dropFirst()) }
+        if sanitized.isEmpty { sanitized = "Unknown" }
+        return sanitized
     }
 }

@@ -36,8 +36,15 @@ actor OperationHistory {
     private var batches: [BatchOperation] = []
     private let historyURL: URL
 
+    // C-05 FIX: Safe unwrap of Application Support directory
     private init() {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            // Fallback to temp directory if Application Support is unavailable
+            let fallback = FileManager.default.temporaryDirectory.appendingPathComponent("FolioSort")
+            try? FileManager.default.createDirectory(at: fallback, withIntermediateDirectories: true)
+            historyURL = fallback.appendingPathComponent("undo_history.json")
+            return
+        }
         let appDir = support.appendingPathComponent("FolioSort")
         try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
         let url = appDir.appendingPathComponent("undo_history.json")
@@ -158,8 +165,14 @@ actor OperationHistory {
         }
     }
 
+    // M-30 FIX: Log disk write failures instead of silently swallowing
     private func saveToDisk() {
-        guard let data = try? JSONEncoder().encode(batches) else { return }
-        try? data.write(to: historyURL)
+        do {
+            let data = try JSONEncoder().encode(batches)
+            try data.write(to: historyURL, options: .atomic)
+        } catch {
+            // Log but don't crash — undo history is non-critical
+            print("[OperationHistory] Failed to save undo history: \(error.localizedDescription)")
+        }
     }
 }

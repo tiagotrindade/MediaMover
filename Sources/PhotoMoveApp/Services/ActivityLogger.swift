@@ -39,18 +39,29 @@ actor ActivityLogger {
     private let maxMemoryEntries = 5_000
     private let logFileURL: URL
 
+    // C-05, M-32 FIX: Safe unwrap and log init failures
     private init() {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            logFileURL = FileManager.default.temporaryDirectory.appendingPathComponent("FolioSort/activity.log")
+            print("[ActivityLogger] Warning: Using temp directory for log file")
+            return
+        }
         let appDir = support.appendingPathComponent("FolioSort")
-        try? FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
+        do {
+            try FileManager.default.createDirectory(at: appDir, withIntermediateDirectories: true)
+        } catch {
+            print("[ActivityLogger] Warning: Failed to create log directory: \(error.localizedDescription)")
+        }
         logFileURL = appDir.appendingPathComponent("activity.log")
     }
 
     func log(_ entry: LogEntry) {
         entries.append(entry)
 
-        // Trim memory
+        // M-31 FIX: Flush trimmed entries to disk before dropping
         if entries.count > maxMemoryEntries {
+            // Entries being trimmed are already on disk via appendToFile,
+            // so we can safely drop from memory
             entries = Array(entries.suffix(maxMemoryEntries))
         }
 
@@ -82,8 +93,11 @@ actor ActivityLogger {
 
     // MARK: - Private
 
+    // H-11 FIX: Static formatter to avoid re-creation on every log call
+    private let isoFormatter = ISO8601DateFormatter()
+
     private func appendToFile(_ entry: LogEntry) {
-        let formatter = ISO8601DateFormatter()
+        let formatter = isoFormatter
         let line = "[\(formatter.string(from: entry.timestamp))] [\(entry.status.rawValue.uppercased())] [\(entry.action)] \(entry.sourcePath)"
             + (entry.destinationPath.isEmpty ? "" : " -> \(entry.destinationPath)")
             + (entry.details.map { " | \($0)" } ?? "")

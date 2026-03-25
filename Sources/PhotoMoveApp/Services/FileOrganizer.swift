@@ -279,7 +279,12 @@ actor FileOrganizer {
                         if verified {
                             result.verifiedFiles += 1
                         } else {
+                            // H-06 FIX: Count verification failures as errors
                             result.verificationFailures += 1
+                            result.errors.append((
+                                file: file.fileName,
+                                error: "Integrity verification failed: hash mismatch after \(config.mode.rawValue.lowercased())"
+                            ))
                             result.verificationErrors.append((
                                 file: file.fileName,
                                 error: "Hash mismatch after \(config.mode.rawValue.lowercased())"
@@ -287,6 +292,7 @@ actor FileOrganizer {
                             await logger.log(action: "verify", source: targetURL.path, status: .error, details: "INTEGRITY FAILURE: hash mismatch")
                         }
                     } catch {
+                        result.verificationFailures += 1
                         result.verificationErrors.append((
                             file: file.fileName,
                             error: "Verification error: \(error.localizedDescription)"
