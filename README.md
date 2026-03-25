@@ -58,6 +58,18 @@ A native macOS app to organize and rename photos, videos, and other files based 
 - **SHA-256** — option for maximum security (Pro)
 - **Move mode**: source hash computed before the move and compared after
 
+### Cloud/NAS Import (Pro)
+- **Network volumes** — use SMB/AFP NAS shares (Synology, QNAP, etc.) as source or destination
+- **iCloud Drive** — full support for iCloud Drive folders, including cloud-only files
+- **Auto-download** — detects not-downloaded iCloud files and downloads them before processing, with progress tracking
+- **Volume badges** — visual indicators in Source/Destination panels showing volume type (NAS, iCloud)
+- **Per-file indicators** — cloud download icons and network badges on individual files in the file list
+- **Resilient transfers** — retry logic with exponential backoff (1s, 3s, 9s) for network file operations
+- **Disconnect handling** — automatic pause/resume when network volumes disconnect and reconnect
+- **Transfer speed** — real-time MB/s display during network operations
+- **Space checking** — available disk space shown on destination, with low-space warning before starting
+- **Connect to Server** — mount SMB/AFP shares directly from the app
+
 ### Duplicate Detection
 - **Skip** — skip all duplicates (Free tier)
 - **Ask Each Time** — per-file dialog: rename, replace, replace if larger, or skip (with "apply to all" option) (Pro)
@@ -99,6 +111,7 @@ FolioSort works out of the box with a generous Free tier. Pro unlocks advanced f
 | Extended EXIF tokens (Lens, ISO) | — | ✓ |
 | Activity log search & export | — | ✓ |
 | Persistent undo history | — | ✓ |
+| Cloud/NAS Import (SMB/AFP/iCloud) | — | ✓ |
 
 ### Supported Formats
 
@@ -135,12 +148,16 @@ The app uses a sidebar with four sections: **Mover**, **Rename**, **Activity**, 
 The Mover view has three panels: source file list, configuration, and a live folder tree preview.
 
 1. Select a **source folder** — click **Scan** to enumerate files
+   - Supports local folders, mounted NAS volumes, and iCloud Drive (Pro)
+   - iCloud-only files are automatically downloaded before processing
 2. Select a **destination folder** in the config panel
+   - Available disk space is shown; low-space warning appears if needed
 3. Choose a **folder pattern** from the dropdown (YYYY/MM/DD, YYYY_MM_DD, etc.)
 4. Toggle **Advanced** to access the full template builder with token palette, presets, and profiles
 5. Configure options: Mode (Copy/Move), Rename with date, File types, Duplicates, Integrity verification, Date fallback
 6. The **Preview panel** updates live as you change settings
 7. Click **Start** to organize
+   - Network operations show real-time transfer speed (MB/s) and auto-retry on failure
 
 ### Rename (Batch rename files)
 1. Select a **source folder** — click **Scan**
