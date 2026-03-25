@@ -102,11 +102,35 @@ final class OrganizerViewModel {
     var fileLimitAlertCount: Int = 0
     var showUpgradeSheet: Bool = false
 
+    // MARK: - Cloud/NAS Import (Pro)
+
+    var sourceVolumeType: VolumeType = .local
+    var destVolumeType: VolumeType = .local
+    var isDownloadingiCloud: Bool = false
+    var iCloudDownloadProgress: Double = 0
+    var iCloudFilesToDownload: Int = 0
+    var transferSpeedFormatted: String = ""
+    var showDisconnectAlert: Bool = false
+    var showSpaceWarning: Bool = false
+    var availableSpaceFormatted: String = ""
+    var totalFileSizeFormatted: String = ""
+    private var volumeMonitorTask: Task<Void, Never>?
+    private let resilientOperator = ResilientFileOperator()
+
     // MARK: - Folder Selection
 
     func selectSource() {
         if let url = pickFolder(title: "Select Source Folder") {
+            let volType = VolumeManager.shared.volumeType(for: url)
+
+            // Gate network/iCloud behind Pro
+            if volType != .local && !ProManager.shared.isPro {
+                showUpgradeSheet = true
+                return
+            }
+
             sourceURL = url
+            sourceVolumeType = volType
             discoveredFiles = []
             result = nil
         }
@@ -114,8 +138,37 @@ final class OrganizerViewModel {
 
     func selectDestination() {
         if let url = pickFolder(title: "Select Destination Folder") {
+            let volType = VolumeManager.shared.volumeType(for: url)
+
+            // Gate network/iCloud behind Pro
+            if volType != .local && !ProManager.shared.isPro {
+                showUpgradeSheet = true
+                return
+            }
+
             destinationURL = url
+            destVolumeType = volType
             result = nil
+
+            // Check available space
+            updateAvailableSpace()
+        }
+    }
+
+    /// Updates the available space display for the destination volume.
+    private func updateAvailableSpace() {
+        guard let dest = destinationURL else {
+            availableSpaceFormatted = ""
+            showSpaceWarning = false
+            return
+        }
+        if let space = VolumeManager.shared.availableSpace(at: dest) {
+            availableSpaceFormatted = VolumeManager.formatBytes(space)
+            // Warn if less than 1 GB
+            showSpaceWarning = space < 1_073_741_824
+        } else {
+            availableSpaceFormatted = ""
+            showSpaceWarning = false
         }
     }
 
@@ -177,6 +230,41 @@ final class OrganizerViewModel {
         }
 
         if !Task.isCancelled {
+            // Tag volume type on each file
+            let volType = sourceVolumeType
+            for i in files.indices {
+                files[i].volumeType = volType
+                if volType == .iCloud {
+                    files[i].iCloudStatus = VolumeManager.shared.iCloudDownloadStatus(for: files[i].url)
+                }
+            }
+
+            // iCloud pre-download phase: download not-yet-local files
+            if volType == .iCloud {
+                let notDownloaded = files.filter { $0.iCloudStatus == .notDownloaded }
+                if !notDownloaded.isEmpty {
+                    isDownloadingiCloud = true
+                    iCloudFilesToDownload = notDownloaded.count
+                    iCloudDownloadProgress = 0
+                    scanMessage = "Downloading \(notDownloaded.count) files from iCloud..."
+
+                    _ = await VolumeManager.shared.downloadICloudFiles(
+                        notDownloaded.map(\.url)
+                    ) { [weak self] downloaded, total in
+                        await MainActor.run {
+                            self?.iCloudDownloadProgress = total > 0 ? Double(downloaded) / Double(total) : 0
+                            self?.scanMessage = "Downloading from iCloud: \(downloaded)/\(total)"
+                        }
+                    }
+
+                    // Update statuses after download
+                    for i in files.indices where files[i].iCloudStatus == .notDownloaded {
+                        files[i].iCloudStatus = VolumeManager.shared.iCloudDownloadStatus(for: files[i].url)
+                    }
+                    isDownloadingiCloud = false
+                }
+            }
+
             // Reverse geocode GPS coordinates if enabled (Pro only)
             let hasGPSFiles = files.contains(where: { $0.hasGPS })
             let canGeocode = geocodingEnabled && ProManager.shared.isPro
@@ -306,6 +394,17 @@ final class OrganizerViewModel {
             }
         }
 
+        // Check available space before starting
+        updateAvailableSpace()
+        if let dest = destinationURL, destVolumeType != .iCloud {
+            let totalSize = filesToOrganize.reduce(Int64(0)) { $0 + $1.fileSize }
+            totalFileSizeFormatted = VolumeManager.formatBytes(totalSize)
+            if let available = VolumeManager.shared.availableSpace(at: dest), totalSize > available {
+                showSpaceWarning = true
+                return
+            }
+        }
+
         isProcessing = true
         progress = 0
         currentFileIndex = 0
@@ -315,6 +414,30 @@ final class OrganizerViewModel {
         operationStartTime = Date()
         filesPerSecond = 0
         estimatedTimeRemaining = 0
+        transferSpeedFormatted = ""
+
+        // Start volume monitoring for network operations
+        let isNetworkOp = sourceVolumeType == .network || destVolumeType == .network
+        if isNetworkOp, let monitorURL = destinationURL ?? sourceURL {
+            volumeMonitorTask = VolumeManager.shared.monitorVolume(
+                at: monitorURL,
+                onDisconnect: { [weak self] in
+                    await MainActor.run {
+                        self?.showDisconnectAlert = true
+                    }
+                    await self?.resilientOperator.pause()
+                },
+                onReconnect: { [weak self] in
+                    await MainActor.run {
+                        self?.showDisconnectAlert = false
+                    }
+                    await self?.resilientOperator.resume()
+                }
+            )
+        }
+
+        // Reset speed tracking
+        await resilientOperator.resetTracking()
 
         let organizer = FileOrganizer()
         let files = filesToOrganize
@@ -330,7 +453,8 @@ final class OrganizerViewModel {
             separateVideos: separateVideos,
             renameWithDate: renameWithDate,
             separateByCamera: false,
-            folderTemplate: folderTemplate
+            folderTemplate: folderTemplate,
+            isNetworkVolume: isNetworkOp
         )
 
         // Duplicate resolver for "Ask" mode
@@ -356,16 +480,25 @@ final class OrganizerViewModel {
             destination: destination,
             config: config,
             duplicateResolver: config.duplicateStrategy == .ask ? resolver : nil,
+            resilientOperator: isNetworkOp ? resilientOperator : nil,
             progressCallback: { [weak self] current, total, fileName in
+                let speed = await self?.resilientOperator.formattedSpeed ?? ""
                 await MainActor.run {
                     self?.currentFileIndex = current
                     self?.totalFiles = total
                     self?.currentFileName = fileName
                     self?.progress = total > 0 ? Double(current) / Double(total) : 0
                     self?.updateETA(processed: current, total: total)
+                    if !speed.isEmpty {
+                        self?.transferSpeedFormatted = speed
+                    }
                 }
             }
         )
+
+        // Stop volume monitoring
+        volumeMonitorTask?.cancel()
+        volumeMonitorTask = nil
 
         // Save operation for undo
         if !records.isEmpty {
@@ -380,6 +513,7 @@ final class OrganizerViewModel {
         operationStartTime = nil
         filesPerSecond = 0
         estimatedTimeRemaining = 0
+        transferSpeedFormatted = ""
         await refreshUndoState()
     }
 
@@ -464,6 +598,20 @@ final class OrganizerViewModel {
     func cancelOperation() {
         currentTask?.cancel()
         currentTask = nil
+        volumeMonitorTask?.cancel()
+        volumeMonitorTask = nil
+    }
+
+    /// Dismiss disconnect alert and cancel the operation.
+    func dismissDisconnectAndCancel() {
+        showDisconnectAlert = false
+        cancelOperation()
+    }
+
+    /// Dismiss the space warning and proceed anyway.
+    func dismissSpaceWarningAndProceed() {
+        showSpaceWarning = false
+        currentTask = Task { await startOrganizing() }
     }
 
     // MARK: - ETA

@@ -36,6 +36,9 @@ struct OrganizerConfig: Sendable {
     // Template-based folder pattern (Phase 2). When set, overrides `pattern`.
     let folderTemplate: String?
 
+    // Network volume support
+    let isNetworkVolume: Bool
+
     init(
         mode: OperationMode,
         pattern: OrganizationPattern,
@@ -47,7 +50,8 @@ struct OrganizerConfig: Sendable {
         separateVideos: Bool,
         renameWithDate: Bool,
         separateByCamera: Bool,
-        folderTemplate: String? = nil
+        folderTemplate: String? = nil,
+        isNetworkVolume: Bool = false
     ) {
         self.mode = mode
         self.pattern = pattern
@@ -60,6 +64,7 @@ struct OrganizerConfig: Sendable {
         self.renameWithDate = renameWithDate
         self.separateByCamera = separateByCamera
         self.folderTemplate = folderTemplate
+        self.isNetworkVolume = isNetworkVolume
     }
 }
 
@@ -81,6 +86,7 @@ actor FileOrganizer {
         destination: URL,
         config: OrganizerConfig,
         duplicateResolver: DuplicateResolver? = nil,
+        resilientOperator: ResilientFileOperator? = nil,
         progressCallback: @Sendable (Int, Int, String) async -> Void
     ) async -> (result: OperationResult, records: [FileOperationRecord]) {
         let startTime = Date()
@@ -226,11 +232,21 @@ actor FileOrganizer {
                     preMoveHash = try FileHashing.hash(of: file.url, algorithm: config.hashAlgorithm)
                 }
 
-                switch config.mode {
-                case .copy:
-                    try fm.copyItem(at: file.url, to: targetURL)
-                case .move:
-                    try fm.moveItem(at: file.url, to: targetURL)
+                if let resilientOperator, config.isNetworkVolume {
+                    // Use resilient operator for network volumes (retry + speed tracking)
+                    switch config.mode {
+                    case .copy:
+                        try await resilientOperator.copyItem(at: file.url, to: targetURL, isNetwork: true)
+                    case .move:
+                        try await resilientOperator.moveItem(at: file.url, to: targetURL, isNetwork: true)
+                    }
+                } else {
+                    switch config.mode {
+                    case .copy:
+                        try fm.copyItem(at: file.url, to: targetURL)
+                    case .move:
+                        try fm.moveItem(at: file.url, to: targetURL)
+                    }
                 }
 
                 result.processedFiles += 1

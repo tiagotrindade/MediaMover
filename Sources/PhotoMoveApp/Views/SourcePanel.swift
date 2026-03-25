@@ -26,6 +26,9 @@ struct SourcePanel: View {
                 .foregroundStyle(.secondary)
                 .tracking(0.5)
             Spacer()
+            if viewModel.sourceVolumeType != .local {
+                VolumeBadge(type: viewModel.sourceVolumeType)
+            }
             if !viewModel.discoveredFiles.isEmpty {
                 Text("\(viewModel.discoveredFiles.count) files")
                     .font(.system(size: 10, weight: .medium))
@@ -200,6 +203,17 @@ struct SourceFileRow: View {
                 }
             }
             Spacer()
+            if file.iCloudStatus == .notDownloaded {
+                Image(systemName: "icloud.and.arrow.down")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.blue.opacity(0.6))
+                    .help("Not downloaded from iCloud")
+            } else if let volType = file.volumeType, volType == .network {
+                Image(systemName: "externaldrive.connected.to.line.below")
+                    .font(.system(size: 9))
+                    .foregroundStyle(.purple.opacity(0.6))
+                    .help("Network volume")
+            }
             if file.requiresPro && !ProManager.shared.isPro {
                 Text("PRO")
                     .font(.system(size: 8, weight: .bold))
@@ -240,6 +254,48 @@ struct SourceFileRow: View {
             Image(systemName: "film").foregroundStyle(Color.green)
         case .other:
             Image(systemName: "doc.text").foregroundStyle(Color.gray)
+        }
+    }
+}
+
+// MARK: - Volume Badge
+
+struct VolumeBadge: View {
+    let type: VolumeType
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 8, weight: .semibold))
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 5).padding(.vertical, 2)
+        .background(Capsule().fill(color.opacity(0.12)))
+    }
+
+    private var icon: String {
+        switch type {
+        case .network: return "externaldrive.connected.to.line.below"
+        case .iCloud:  return "icloud"
+        case .local:   return "internaldrive"
+        }
+    }
+
+    private var label: String {
+        switch type {
+        case .network: return "NAS"
+        case .iCloud:  return "iCloud"
+        case .local:   return "Local"
+        }
+    }
+
+    private var color: Color {
+        switch type {
+        case .network: return .purple
+        case .iCloud:  return .blue
+        case .local:   return .secondary
         }
     }
 }

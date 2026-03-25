@@ -77,6 +77,18 @@ struct MoverView: View {
         } message: {
             Text("Free version processes up to 100 files per operation. You have \(viewModel.fileLimitAlertCount) files. Upgrade to Pro for unlimited.")
         }
+        .alert("Network Volume Disconnected", isPresented: $viewModel.showDisconnectAlert) {
+            Button("Wait for Reconnection") { }
+            Button("Cancel Operation", role: .destructive) { viewModel.dismissDisconnectAndCancel() }
+        } message: {
+            Text("The network volume has been disconnected. The operation is paused and will resume automatically when the volume is available again.")
+        }
+        .alert("Low Disk Space", isPresented: $viewModel.showSpaceWarning) {
+            Button("Continue Anyway") { viewModel.dismissSpaceWarningAndProceed() }
+            Button("Cancel", role: .cancel) { viewModel.showSpaceWarning = false }
+        } message: {
+            Text("The destination volume has only \(viewModel.availableSpaceFormatted) available. Your files total \(viewModel.totalFileSizeFormatted). The operation may fail if space runs out.")
+        }
     }
 }
 
@@ -97,6 +109,32 @@ struct ProgressOverlayView: View {
                     Text("Undoing last operation…")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.secondary)
+                } else if viewModel.isDownloadingiCloud {
+                    // iCloud download phase
+                    VStack(spacing: 10) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "icloud.and.arrow.down")
+                                .font(.system(size: 14))
+                                .foregroundStyle(.blue)
+                            Text("Downloading from iCloud...")
+                                .font(.system(size: 13, weight: .medium))
+                        }
+
+                        ProgressView(value: viewModel.iCloudDownloadProgress)
+                            .progressViewStyle(.linear)
+                            .frame(width: 320)
+                            .tint(.blue)
+
+                        Text("\(Int(viewModel.iCloudDownloadProgress * Double(viewModel.iCloudFilesToDownload))) / \(viewModel.iCloudFilesToDownload) files")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+
+                        Button("Cancel") {
+                            viewModel.cancelOperation()
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .controlSize(.small)
+                    }
                 } else {
                     VStack(spacing: 10) {
                         ProgressView(value: viewModel.progress)
@@ -128,6 +166,13 @@ struct ProgressOverlayView: View {
                                     Text("ETA \(formatETA(viewModel.estimatedTimeRemaining))")
                                         .font(.system(size: 11))
                                 }
+                            }
+                            // Transfer speed for network operations
+                            if !viewModel.transferSpeedFormatted.isEmpty {
+                                Text("·").foregroundStyle(.quaternary)
+                                Text(viewModel.transferSpeedFormatted)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.blue)
                             }
                         }
                         .foregroundStyle(.tertiary)

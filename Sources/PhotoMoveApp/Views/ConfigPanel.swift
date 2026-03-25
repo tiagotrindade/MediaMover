@@ -69,32 +69,38 @@ struct ConfigPanel: View {
     // MARK: - Destination
 
     private var destinationCard: some View {
-        Button {
-            viewModel.selectDestination()
-        } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "folder.badge.plus")
-                        .font(.system(size: 13)).foregroundStyle(.green).frame(width: 20)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Destination Folder")
-                            .font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
-                        Text(viewModel.destinationURL?.abbreviatingWithTildeInPath ?? "Click to select\u{2026}")
-                            .font(.system(size: 11))
-                            .foregroundStyle(viewModel.destinationURL != nil ? .primary : .secondary)
-                            .lineLimit(2).truncationMode(.middle)
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                viewModel.selectDestination()
+            } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 13)).foregroundStyle(.green).frame(width: 20)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 4) {
+                                Text("Destination Folder")
+                                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(.tertiary)
+                                if viewModel.destVolumeType != .local {
+                                    VolumeBadge(type: viewModel.destVolumeType)
+                                }
+                            }
+                            Text(viewModel.destinationURL?.abbreviatingWithTildeInPath ?? "Click to select\u{2026}")
+                                .font(.system(size: 11))
+                                .foregroundStyle(viewModel.destinationURL != nil ? .primary : .secondary)
+                                .lineLimit(2).truncationMode(.middle)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.tertiary)
                     }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.system(size: 9)).foregroundStyle(.tertiary)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color(NSColor.controlBackgroundColor))
+                            .overlay(RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(viewModel.destinationURL != nil ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1))
+                    )
                 }
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(NSColor.controlBackgroundColor))
-                        .overlay(RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(viewModel.destinationURL != nil ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1))
-                )
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
@@ -106,11 +112,31 @@ struct ConfigPanel: View {
             .dropDestination(for: URL.self) { urls, _ in
                 guard let url = urls.first, url.isDirectory else { return false }
                 viewModel.destinationURL = url
+                viewModel.destVolumeType = VolumeManager.shared.volumeType(for: url)
                 viewModel.result = nil
                 return true
             } isTargeted: {
                 isDestDropTargeted = $0
             }
+
+            // Available space indicator
+            if viewModel.destinationURL != nil && !viewModel.availableSpaceFormatted.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: viewModel.showSpaceWarning ? "exclamationmark.triangle.fill" : "internaldrive")
+                        .font(.system(size: 9))
+                        .foregroundStyle(viewModel.showSpaceWarning ? .orange : .secondary)
+                    Text("\(viewModel.availableSpaceFormatted) available")
+                        .font(.system(size: 10))
+                        .foregroundStyle(viewModel.showSpaceWarning ? .orange : .secondary)
+                    if viewModel.destVolumeType == .iCloud {
+                        Text("(depends on iCloud plan)")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .padding(.horizontal, 4)
+            }
+        }
     }
 
     // MARK: - Folder Structure (Simple + Advanced)

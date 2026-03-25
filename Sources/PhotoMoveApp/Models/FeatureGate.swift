@@ -20,6 +20,7 @@ enum FeatureGate: CaseIterable, Sendable {
     case activityLogExport
     case videoSubfolder
     case renameWithDate
+    case cloudNasImport              // Network volumes & iCloud Drive
 
     var requiresPro: Bool { true }
 

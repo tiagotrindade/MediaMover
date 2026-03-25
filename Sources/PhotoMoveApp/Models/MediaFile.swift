@@ -42,6 +42,12 @@ struct MediaFile: Identifiable, Sendable {
     /// Whether this file requires Pro to process (RAW formats in Free tier).
     var requiresPro: Bool = false
 
+    /// Volume type where this file resides (local, network, iCloud).
+    var volumeType: VolumeType?
+
+    /// iCloud download status (only relevant for iCloud files).
+    var iCloudStatus: ICloudDownloadStatus?
+
     /// Returns the best available date given the user's fallback preference.
     func effectiveDate(fallback: DateFallback = .creationDate) -> Date? {
         if let dateTaken { return dateTaken }

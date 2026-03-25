@@ -88,6 +88,9 @@ final class RenameViewModel {
 
     // MARK: - Folder Selection
 
+    // Cloud/NAS state
+    var sourceVolumeType: VolumeType = .local
+
     func selectSource() {
         let panel = NSOpenPanel()
         panel.title = "Select Folder to Rename Files"
@@ -95,7 +98,15 @@ final class RenameViewModel {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let volType = VolumeManager.shared.volumeType(for: url)
+        if volType != .local && !ProManager.shared.isPro {
+            showUpgradeSheet = true
+            return
+        }
+
         sourceURL = url
+        sourceVolumeType = volType
         discoveredFiles = []
         previewItems = []
         renameComplete = false
@@ -109,6 +120,13 @@ final class RenameViewModel {
         panel.allowsMultipleSelection = false
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        let volType = VolumeManager.shared.volumeType(for: url)
+        if volType != .local && !ProManager.shared.isPro {
+            showUpgradeSheet = true
+            return
+        }
+
         destinationURL = url
     }
 
