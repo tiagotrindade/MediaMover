@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Install FolioSort</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#1a1c2a;
+    --card:#232538;
+    --card-hover:#2a2d44;
+    --border:#2e3150;
+    --text:#e4e6f0;
+    --text2:#9b9db5;
+    --text3:#6c6e88;
+    --amber:#f5a623;
+    --amber-bg:rgba(245,166,35,.12);
+    --green:#34d058;
+    --green-bg:rgba(52,208,88,.10);
+    --blue:#58a6ff;
+    --blue-bg:rgba(88,166,255,.10);
+    --red:#f85149;
+    --red-bg:rgba(248,81,73,.08);
+    --radius:14px;
+  }
+  html{font-size:16px}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    background:var(--bg);color:var(--text);
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    padding:48px 24px 64px;line-height:1.55;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ── Header ── */
+  .header{text-align:center;margin-bottom:40px}
+  .header h1{font-size:1.6rem;font-weight:700;letter-spacing:-.02em;margin-bottom:6px}
+  .header .sub{color:var(--text2);font-size:.95rem}
+  .section-label{
+    font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--text3);margin-bottom:16px;
+  }
+
+  /* ── Cards ── */
+  .container{max-width:640px;width:100%}
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+    padding:28px 30px;margin-bottom:16px;transition:border-color .2s;
+  }
+  .card:hover{border-color:#3d4068}
+
+  /* ── Badge ── */
+  .badge{
+    display:inline-block;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    padding:3px 10px;border-radius:6px;vertical-align:middle;margin-right:10px;
+  }
+  .badge-amber{background:var(--amber);color:#1a1c2a}
+  .badge-green{background:var(--green);color:#1a1c2a}
+  .badge-blue{background:var(--blue);color:#1a1c2a}
+
+  .card-title{font-size:1.15rem;font-weight:700;display:inline;vertical-align:middle}
+  .card-sub{color:var(--text2);font-size:.88rem;margin-top:8px}
+  .card-compat{
+    display:inline-block;font-size:.75rem;font-weight:600;
+    padding:2px 9px;border-radius:5px;margin-top:8px;
+  }
+  .compat-sequoia{background:var(--blue-bg);color:var(--blue)}
+  .compat-sonoma{background:var(--green-bg);color:var(--green)}
+  .compat-all{background:var(--amber-bg);color:var(--amber)}
+
+  /* ── Steps ── */
+  .steps{margin-top:20px;display:flex;flex-direction:column;gap:14px}
+  .step{display:flex;align-items:flex-start;gap:14px}
+  .step-num{
+    flex-shrink:0;width:30px;height:30px;border-radius:50%;
+    background:var(--amber);color:#1a1c2a;font-size:.82rem;font-weight:800;
+    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  }
+  .step-text{font-size:.92rem;color:var(--text);line-height:1.5}
+  .step-text strong{color:#fff;font-weight:600}
+  .step-text code{
+    background:rgba(255,255,255,.08);padding:2px 7px;border-radius:5px;
+    font-family:"SF Mono",SFMono-Regular,Menlo,monospace;font-size:.82rem;
+    color:var(--amber);user-select:all;word-break:break-all;
+  }
+
+  /* ── Divider ── */
+  .divider{
+    border:none;border-top:1px solid var(--border);margin:32px 0 28px;
+  }
+
+  /* ── Note box ── */
+  .note{
+    background:var(--red-bg);border:1px solid rgba(248,81,73,.18);
+    border-radius:10px;padding:16px 18px;margin-top:12px;
+    font-size:.84rem;color:var(--text2);line-height:1.55;
+  }
+  .note strong{color:var(--red);font-weight:600}
+
+  /* ── Troubleshooting ── */
+  .trouble{
+    background:rgba(255,255,255,.03);border:1px solid var(--border);
+    border-radius:10px;padding:18px 20px;margin-top:8px;
+  }
+  .trouble summary{
+    cursor:pointer;font-size:.88rem;font-weight:600;color:var(--text2);
+    list-style:none;display:flex;align-items:center;gap:8px;
+  }
+  .trouble summary::before{content:"▸";font-size:.7rem;transition:transform .2s}
+  .trouble[open] summary::before{transform:rotate(90deg)}
+  .trouble .content{margin-top:14px;font-size:.86rem;color:var(--text2);line-height:1.6}
+  .trouble .content p{margin-bottom:10px}
+  .trouble .content code{
+    background:rgba(255,255,255,.08);padding:2px 7px;border-radius:5px;
+    font-family:"SF Mono",SFMono-Regular,Menlo,monospace;font-size:.8rem;color:var(--amber);
+  }
+
+  /* ── Footer ── */
+  .footer{
+    text-align:center;margin-top:40px;font-size:.78rem;color:var(--text3);
+  }
+  .footer a{color:var(--blue);text-decoration:none}
+  .footer a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Choose How to Open FolioSort</h1>
+    <p class="sub">FolioSort is not notarized by Apple, so macOS will block it on first launch.<br>Pick the method that matches your macOS version.</p>
+  </div>
+
+  <hr class="divider" style="margin-top:0">
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- METHOD 1 — Terminal (All versions)     -->
+  <!-- ═══════════════════════════════════════ -->
+  <p class="section-label">Recommended</p>
+
+  <div class="card">
+    <span class="badge badge-amber">Fastest</span>
+    <span class="card-title">Terminal — One Command</span>
+    <p class="card-sub">Works on every macOS version. Takes 5 seconds.</p>
+    <span class="card-compat compat-all">macOS 14 Sonoma &amp; 15+ Sequoia</span>
+
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-text">Drag <strong>FolioSort.app</strong> to your <strong>Applications</strong> folder</span>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-text">Open <strong>Terminal</strong> (Spotlight → type "Terminal")</span>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-text">Paste this command and press Enter:<br>
+          <code>xattr -cr /Applications/FolioSort.app</code>
+        </span>
+      </div>
+      <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-text">Done — double-click FolioSort to open. Works forever after this.</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- METHOD 2 — System Settings (Sequoia)   -->
+  <!-- ═══════════════════════════════════════ -->
+  <p class="section-label">Alternative Methods</p>
+
+  <div class="card">
+    <span class="badge badge-blue">No Terminal</span>
+    <span class="card-title">System Settings → Open Anyway</span>
+    <p class="card-sub">For macOS 15 Sequoia and later. No Terminal needed.</p>
+    <span class="card-compat compat-sequoia">macOS 15+ Sequoia</span>
+
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-text">Drag <strong>FolioSort.app</strong> to your <strong>Applications</strong> folder</span>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-text">Double-click <strong>FolioSort</strong> — macOS will block it. Click <strong>"Done"</strong></span>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-text">Open <strong>System Settings → Privacy &amp; Security</strong></span>
+      </div>
+      <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-text">Scroll down to find <strong>"FolioSort was blocked"</strong> and click <strong>"Open Anyway"</strong></span>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-text">Confirm with your password or Touch ID. FolioSort will launch.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- METHOD 3 — Right-Click (Sonoma only)   -->
+  <!-- ═══════════════════════════════════════ -->
+  <div class="card">
+    <span class="badge badge-green">Simple</span>
+    <span class="card-title">Right-Click → Open</span>
+    <p class="card-sub">The classic method. Only works on macOS 14 Sonoma.</p>
+    <span class="card-compat compat-sonoma">macOS 14 Sonoma only</span>
+
+    <div class="steps">
+      <div class="step">
+        <span class="step-num">1</span>
+        <span class="step-text">Drag <strong>FolioSort.app</strong> to your <strong>Applications</strong> folder</span>
+      </div>
+      <div class="step">
+        <span class="step-num">2</span>
+        <span class="step-text"><strong>Right-click</strong> (or Control-click) on FolioSort in Applications</span>
+      </div>
+      <div class="step">
+        <span class="step-num">3</span>
+        <span class="step-text">Select <strong>"Open"</strong> from the context menu</span>
+      </div>
+      <div class="step">
+        <span class="step-num">4</span>
+        <span class="step-text">Click <strong>"Open"</strong> in the security dialog that appears</span>
+      </div>
+      <div class="step">
+        <span class="step-num">5</span>
+        <span class="step-text">Done — FolioSort will launch. Future opens work with a double-click.</span>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>⚠ Does NOT work on macOS 15 Sequoia.</strong> Apple removed this bypass in Sequoia. Use the Terminal or System Settings method above instead.
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- Troubleshooting                        -->
+  <!-- ═══════════════════════════════════════ -->
+  <details class="trouble">
+    <summary>Troubleshooting — still can't open?</summary>
+    <div class="content">
+      <p>If none of the methods above work, try these steps:</p>
+      <p><strong>1. Check that the app is in Applications:</strong><br>
+        Make sure you dragged FolioSort.app out of the DMG and into /Applications (or another folder). You cannot run apps directly from a DMG.</p>
+      <p><strong>2. Re-run the xattr command with sudo:</strong><br>
+        <code>sudo xattr -cr /Applications/FolioSort.app</code><br>
+        Enter your Mac password when prompted.</p>
+      <p><strong>3. Check System Settings:</strong><br>
+        Go to <strong>System Settings → Privacy &amp; Security → App Management</strong> and make sure FolioSort isn't listed as blocked.</p>
+      <p><strong>4. Re-download the DMG:</strong><br>
+        Occasionally the download can be corrupted. Try downloading the latest version from the <a href="https://github.com/tiagotrindade/FolioSort/releases/latest" style="color:var(--blue)">releases page</a>.</p>
+    </div>
+  </details>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>FolioSort v2.3.1 &nbsp;·&nbsp; <a href="https://github.com/tiagotrindade/FolioSort">GitHub</a> &nbsp;·&nbsp; <a href="https://github.com/tiagotrindade/FolioSort/releases/latest">Latest Release</a> &nbsp;·&nbsp; macOS 14+</p>
+  </div>
+
+</div>
+
+</body>
+</html>

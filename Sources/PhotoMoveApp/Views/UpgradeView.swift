@@ -141,12 +141,6 @@ struct UpgradeView: View {
 
     private var purchaseSection: some View {
         VStack(spacing: 6) {
-            Text("€9.99 / $9.99")
-                .font(.system(size: 20, weight: .bold))
-            Text("One-time purchase")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-
             Button {
                 NSWorkspace.shared.open(LemonSqueezyService.checkoutURL)
             } label: {

@@ -41,6 +41,10 @@ dmg: app
 	@mkdir -p /tmp/photomove_dmg_staging
 	@cp -r "$(APP_BUNDLE)" /tmp/photomove_dmg_staging/
 	@ln -s /Applications /tmp/photomove_dmg_staging/Applications
+	@if [ -f docs/install.html ]; then \
+		cp docs/install.html "/tmp/photomove_dmg_staging/How to Install.html"; \
+		echo "  ✓ Install guide included"; \
+	fi
 	@hdiutil create \
 		-volname "$(BUNDLE_NAME)" \
 		-srcfolder /tmp/photomove_dmg_staging \
