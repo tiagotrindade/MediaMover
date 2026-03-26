@@ -60,6 +60,14 @@ final class ProManager {
             // Assume valid until background re-validation
             isPro = true
             licenseStatus = .active
+            UserDefaults.standard.set(true, forKey: "FolioSort_ProUnlocked")
+        } else {
+            // No license in Keychain — ensure stale UserDefaults is cleared
+            // (covers upgrades from old ProManager that stored Pro flag in UserDefaults)
+            isPro = false
+            licenseStatus = .none
+            UserDefaults.standard.set(false, forKey: "FolioSort_ProUnlocked")
+            UserDefaults.standard.synchronize()
         }
     }
 

@@ -52,8 +52,10 @@ actor OperationHistory {
 
         // Load from disk inline (nonisolated init context)
         // Only load persistent history if Pro is enabled
-        let isPro = UserDefaults.standard.bool(forKey: "FolioSort_ProUnlocked")
-        if isPro {
+        // Note: reads UserDefaults as sync proxy — ProManager.init() sets this
+        // consistently with Keychain state, so this is always in sync.
+        let proEnabled = UserDefaults.standard.bool(forKey: "FolioSort_ProUnlocked")
+        if proEnabled {
             if let data = try? Data(contentsOf: url),
                let decoded = try? JSONDecoder().decode([BatchOperation].self, from: data) {
                 batches = decoded
@@ -63,9 +65,9 @@ actor OperationHistory {
     }
 
     func addBatch(_ batch: BatchOperation) {
-        let isPro = UserDefaults.standard.bool(forKey: "FolioSort_ProUnlocked")
+        let proEnabled = UserDefaults.standard.bool(forKey: "FolioSort_ProUnlocked")
 
-        if isPro {
+        if proEnabled {
             batches.append(batch)
             // Keep last 50 batches
             if batches.count > 50 {
