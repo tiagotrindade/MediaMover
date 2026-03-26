@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "foliosort-debug",
+      "runtimeExecutable": "swift",
+      "runtimeArgs": ["run"],
+      "port": 0
+    },
+    {
+      "name": "foliosort-release",
+      "runtimeExecutable": "swift",
+      "runtimeArgs": ["build", "-c", "release"],
+      "port": 0
+    },
+    {
+      "name": "foliosort-app",
+      "runtimeExecutable": "make",
+      "runtimeArgs": ["run"],
+      "port": 0
+    }
+  ]
+}
