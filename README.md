@@ -87,6 +87,21 @@ A native macOS app to organize and rename photos, videos, and other files based 
 - Persistent history across sessions (up to 50 batches)
 - Automatic cleanup of empty directories
 
+### Buy FolioSort Pro
+
+**€9.99 / $9.99 — One-time purchase, no subscription.**
+
+**[Buy FolioSort Pro](https://foliosort.lemonsqueezy.com/checkout/buy/ea44ddb0-9fa7-4555-a0cb-17e7bab0e8d5)**
+
+1. Click the link above → complete checkout
+2. Receive your **license key** by email
+3. Open FolioSort → Settings → **Upgrade to Pro** → paste your key → **Activate**
+4. Done — Pro unlocked forever on that Mac
+
+- License key stored securely in macOS Keychain
+- Works offline (7-day grace period between validations)
+- Transfer your license to another Mac anytime (deactivate → reactivate)
+
 ### Free & Pro Tiers
 
 FolioSort works out of the box with a generous Free tier. Pro unlocks advanced features for power users.
@@ -172,7 +187,7 @@ The Mover view has three panels: source file list, configuration, and a live fol
 Full operation history with timestamps, status indicators, search, and export.
 
 ### Settings
-View Pro status, toggle Pro features, and access developer tools.
+View Pro status, activate/deactivate license key, and manage preferences. Shows masked license key, validation status (active/offline/expired), and a deactivation option to transfer your license to another Mac.
 
 ### Undo
 Use the **Undo** button in the toolbar to reverse the last operation.
